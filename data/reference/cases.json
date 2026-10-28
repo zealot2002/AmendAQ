@@ -1,0 +1,10 @@
+{
+  "CASE-2026-001": {
+    "case_id": "CASE-2026-001",
+    "procedure_id": "residence_permit_renewal",
+    "subject_label": "居住证续签",
+    "submitted_at": "2026-03-01",
+    "status": "pre_review",
+    "status_label": "预审中"
+  }
+}

@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.py[cod]
+.env
+dist/
+*.egg-info/
+.pytest_cache/
+data/traces/
+data/mycs.db
+data/kg/
+frontend/node_modules/
+frontend/dist/
+data/dev-logs/
+data/.skip_demo_seed
+data/.active_document_id

@@ -1,0 +1,15 @@
+{
+  "residence_permit_renewal_review": {
+    "policy_id": "residence_permit_renewal_review",
+    "title": "居住证续签预审时限",
+    "procedure_id": "residence_permit_renewal",
+    "review_stage": "pre_review",
+    "max_working_days": 5,
+    "summary": "预审环节自受理之日起不超过 5 个工作日。",
+    "evidence": {
+      "quote": "预审环节自受理之日起不超过 5 个工作日。",
+      "source_uri": "ref://policy/residence-permit-renewal-2026.pdf",
+      "effective_from": "2026-01-01"
+    }
+  }
+}

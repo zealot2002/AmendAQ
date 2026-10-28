@@ -1,0 +1,30 @@
+[project]
+name = "mycs"
+version = "0.1.0"
+description = "Knowledge Agent customer service (reference implementation)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+ui = ["gradio>=5.0"]
+web = ["fastapi>=0.115.0", "uvicorn[standard]>=0.30.0", "python-multipart>=0.0.9"]
+
+[project.scripts]
+mycs = "mycs.cli:main"
+mycs-ui = "mycs.ui.gradio_app:main"
+mycs-api = "mycs.api.server:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

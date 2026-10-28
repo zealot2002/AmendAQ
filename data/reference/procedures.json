@@ -1,0 +1,8 @@
+{
+  "residence_permit_renewal": {
+    "procedure_id": "residence_permit_renewal",
+    "title": "居住证续签",
+    "online_available": true,
+    "summary": "符合条件的申请人可通过线上办事大厅提交续签申请。"
+  }
+}
