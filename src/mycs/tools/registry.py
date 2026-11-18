@@ -97,6 +97,7 @@ class ToolRegistry:
         limit: int = 5,
         entity_id_in: list[str] | None = None,
         section_prefix: str | None = None,
+        section_refs: list[str] | None = None,
     ) -> dict[str, Any]:
         return self._svc.kg_search_entities(
             query=query,
@@ -104,6 +105,7 @@ class ToolRegistry:
             limit=limit,
             entity_id_in=entity_id_in,
             section_prefix=section_prefix,
+            section_refs=section_refs,
         )
 
     def _kg_get_entity_by_section(

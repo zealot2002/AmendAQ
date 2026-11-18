@@ -7,6 +7,7 @@ from mycs.knowledge.service import KnowledgeService
 from mycs.log import get_logger
 from mycs.log_detail import log_step
 from mycs.planning.query_intent import is_whole_document_query
+from mycs.planning.sibling_expand import scope_section_refs, select_related_siblings
 from mycs.ui.trace_llm_capture import take_llm_captures
 
 logger = get_logger(__name__)
@@ -30,9 +31,65 @@ class TocDrillResult:
     path: list[dict[str, Any]] = field(default_factory=list)
     scope_node_id: str | None = None
     scope_section_prefix: str | None = None
+    scope_section_refs: list[str] = field(default_factory=list)
+    sibling_nodes: list[dict[str, Any]] = field(default_factory=list)
     stopped_at_level: int = 0
     reason: str = ""
     trace_events: list[dict[str, Any]] = field(default_factory=list)
+
+
+def _expand_related_siblings(
+    result: TocDrillResult,
+    *,
+    svc: KnowledgeService,
+    document_id: str,
+    question: str,
+    path: list[dict[str, Any]],
+) -> None:
+    """Pull same-chapter leaves that share the picked topic (e.g. 5.1 → 5.5)."""
+    if len(path) < 2:
+        return
+    parent = path[-2]
+    picked = path[-1]
+    parent_id = str(parent.get("node_id") or "")
+    if not parent_id or picked.get("kind") != "leaf":
+        return
+    bucket = svc.wiki_list_toc_children(
+        parent_node_id=parent_id,
+        document_id=document_id,
+    )
+    siblings = select_related_siblings(picked, list(bucket.get("nodes") or []), question)
+    result.sibling_nodes = siblings
+    result.scope_section_refs = scope_section_refs(picked, siblings)
+    if not siblings:
+        return
+    slim = [
+        {
+            "node_id": n.get("node_id"),
+            "section_ref": n.get("section_ref"),
+            "title": n.get("title"),
+        }
+        for n in siblings
+    ]
+    result.trace_events.append(
+        {
+            "mode": "sibling_expand",
+            "llm_invoked": False,
+            "picked": {
+                "section_ref": picked.get("section_ref"),
+                "title": picked.get("title"),
+                "node_id": picked.get("node_id"),
+            },
+            "siblings": slim,
+            "scope_section_refs": result.scope_section_refs,
+            "reason": "同章标题相邻条款一并纳入，避免单叶漏掉结转/上限等规则",
+        }
+    )
+    logger.info(
+        "joyjoy: toc sibling expand picked=%s siblings=%s",
+        picked.get("section_ref"),
+        [n.get("section_ref") for n in siblings],
+    )
 
 
 def _auto_pick_single(choices: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -242,6 +299,13 @@ def run_toc_drill(
                 section_ref=picked.get("section_ref"),
                 title=picked.get("title"),
             )
+            _expand_related_siblings(
+                result,
+                svc=svc,
+                document_id=document_id,
+                question=question,
+                path=path,
+            )
             break
     else:
         result.reason = result.reason or "max_levels"
@@ -259,6 +323,9 @@ def run_toc_drill(
                 "scope_section_prefix": result.scope_section_prefix,
             }
         )
+
+    if not result.scope_section_refs and result.scope_section_prefix:
+        result.scope_section_refs = [result.scope_section_prefix]
 
     log_step(
         logger,

@@ -32,6 +32,10 @@ def resolve_step_kind(step: str, payload: dict[str, Any] | None = None) -> tuple
         return "llm", KIND_LABELS["llm"]
     if step == "answer":
         return "llm", KIND_LABELS["llm"]
+    if step == "skill":
+        return "pipeline", KIND_LABELS["pipeline"]
+    if step == "skill_revise":
+        return "llm", KIND_LABELS["llm"]
     if step == "plan_guard":
         return "pipeline", KIND_LABELS["pipeline"]
     if step == "tool":

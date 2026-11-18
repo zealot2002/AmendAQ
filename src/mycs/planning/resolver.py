@@ -36,14 +36,20 @@ class GapResolver:
         if req.source == KnowledgeSource.GRAPH:
             if field == "graph.entity.search":
                 scoped = context.get("wiki_scope_entity_ids")
+                section_refs = context.get("wiki_scope_section_refs") or None
+                section_prefix = None
+                if not section_refs:
+                    section_prefix = params.get("section_prefix") or context.get(
+                        "wiki_scope_section_prefix"
+                    )
                 return "kg_search_entities", {
                     "query": params.get("query") or context.get("raw_question", ""),
                     "document_id": params.get("document_id")
                     or context.get("graph_document_id"),
                     "limit": params.get("limit", 5),
                     "entity_id_in": params.get("entity_id_in") or scoped,
-                    "section_prefix": params.get("section_prefix")
-                    or context.get("wiki_scope_section_prefix"),
+                    "section_prefix": section_prefix,
+                    "section_refs": section_refs,
                 }
             if field == "graph.entity.by_section":
                 return "kg_get_entity_by_section", {
@@ -197,7 +203,15 @@ class GapResolver:
         elif tool == "wiki_get_leaves":
             if result.get("ok") is False:
                 return
-            _merge_wiki_leaves(context, result.get("leaves") or [])
+            leaves = result.get("leaves") or []
+            _merge_wiki_leaves(context, leaves)
+            extra = [str(lf["entity_id"]) for lf in leaves if lf.get("entity_id")]
+            if extra:
+                scoped_ids = list(context.get("wiki_scope_entity_ids") or [])
+                for eid in extra:
+                    if eid not in scoped_ids:
+                        scoped_ids.append(eid)
+                context["wiki_scope_entity_ids"] = scoped_ids
 
 
 def _merge_wiki_leaves(context: dict[str, Any], leaves: list[dict[str, Any]]) -> None:

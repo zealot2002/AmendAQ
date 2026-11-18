@@ -63,6 +63,22 @@ def create_llm(backend: str | None = None) -> AgentLLM:
             trust_env=True,
         )
 
+    if name in ("openai", "vllm", "compat"):
+        base = os.environ.get("OPENAI_API_BASE", "http://192.168.10.175:8000/v1").rstrip("/")
+        # 无 API key 的兼容网关：占位即可，多数服务会忽略 Authorization
+        key = os.environ.get("OPENAI_API_KEY")
+        if key is None or not str(key).strip():
+            key = "EMPTY"
+        model = os.environ.get("OPENAI_MODEL", "Qwen3.6")
+        logger.info("joyjoy: using OpenAI-compat model=%s base=%s", model, base)
+        return OpenAICompatLLM(
+            base_url=base,
+            api_key=key,
+            model=model,
+            provider="openai",
+            trust_env=False,
+        )
+
     if name == "ollama":
         logger.info("joyjoy: using Ollama")
         return OpenAICompatLLM(
@@ -73,7 +89,7 @@ def create_llm(backend: str | None = None) -> AgentLLM:
             trust_env=False,
         )
 
-    raise RuntimeError(f"unknown MYCS_LLM={name!r} (use groq, glm, or ollama)")
+    raise RuntimeError(f"unknown MYCS_LLM={name!r} (use openai, groq, glm, or ollama)")
 
 
 def _groq_api_key() -> str | None:

@@ -194,6 +194,7 @@ class KnowledgeService:
         limit: int = 5,
         entity_id_in: list[str] | None = None,
         section_prefix: str | None = None,
+        section_refs: list[str] | None = None,
     ) -> dict[str, Any]:
         clauses = ["e.entity_type = ?"]
         params: list[Any] = [entity_type]
@@ -223,7 +224,12 @@ class KnowledgeService:
             if entity_id_in and ent["entity_id"] not in entity_id_in:
                 continue
             sec = str(ent.get("section") or "")
-            if section_prefix and sec:
+            if section_refs and sec:
+                from mycs.planning.sibling_expand import section_in_scopes
+
+                if not section_in_scopes(sec, section_refs):
+                    continue
+            elif section_prefix and sec:
                 pref = section_prefix.rstrip(".")
                 if not (sec == pref or sec.startswith(f"{pref}.")):
                     continue

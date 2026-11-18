@@ -155,7 +155,16 @@ class OpenAICompatLLM:
         chapters_in_batch: list[dict[str, object]],
         already_selected: list[dict[str, str]],
         batches_remaining: int,
+        composite_query: bool = False,
     ) -> dict[str, Any]:
+        composite_note = ""
+        if composite_query:
+            composite_note = (
+                "\n\n【综合/多事项问题】用户可能在问多个彼此独立的事项（如离职+年假+报销+归还电脑）。"
+                "每一事项可能落在**不同章**；本批命中的章不能代表已覆盖全部。"
+                "必须在本批选出所有可能相关的章；"
+                f"在 batches_remaining_after_this>0 时**禁止 action=done**，只能用 pick 或 continue。"
+            )
         system = (
             "你是知识库目录分批浏览助手。手册一级目录（章）很多，系统会**分批**把章列表发给你。"
             "你的目标是：根据用户问题，找出**可能包含答案的章**，不要漏掉相关章。"
@@ -168,9 +177,10 @@ class OpenAICompatLLM:
             "- pick：本批中有相关章，把 section_ref 写入 section_refs（可多选）；"
             "若仍需查看后续批次继续找，action 仍用 pick 并只写本批命中的章；"
             "- continue：本批完全不相关，且还需要看后续批次；"
-            "- done：已足够（already_selected + 本批 pick）覆盖问题，不必再看后续批；"
+            "- done：仅当**已看完所有批**且 already_selected 已覆盖问题的全部事项时才能用；"
             "- need_full_handbook：问题需要通读全手册（如「所有」「全部」「列举每一个」），不再分批。"
             "\nsection_ref 必须来自本批 chapters 列表，不得编造。"
+            + composite_note
         )
         user = json.dumps(
             {
@@ -181,6 +191,7 @@ class OpenAICompatLLM:
                 "batches_remaining_after_this": batches_remaining,
                 "already_selected_chapters": already_selected,
                 "chapters_in_this_batch": chapters_in_batch,
+                "composite_query": composite_query,
             },
             ensure_ascii=False,
         )
@@ -217,6 +228,7 @@ class OpenAICompatLLM:
             "2) 否则 wiki.toc.branch：params.node_id 或 section_prefix 限定子树；"
             "3) graph.entity.search（query 用用户原问；若有 branch 则检索限定在该子树）；"
             "4) graph.entity.by_section 的 section 必须来自 wiki_toc_outline 的 leaf section_ref；"
+            "若 wiki_scope_section_refs 含多条，每一条都要单独 by_section，不要只查落下的那一节；"
             "5) wiki.toc.leaves 可指定 node_ids 直接取叶子；"
             "6) graph.read.query 仅用于列举/汇总/金额类。"
             "禁止臆造条号、禁止 neighbors 凑数。"
@@ -235,6 +247,7 @@ class OpenAICompatLLM:
             "question": understood.raw_question,
             "wiki_drill_path": plan_context.get("wiki_drill_path") or [],
             "wiki_scope_section_prefix": plan_context.get("wiki_scope_section_prefix"),
+            "wiki_scope_section_refs": plan_context.get("wiki_scope_section_refs") or [],
             "wiki_selected_chapters": plan_context.get("wiki_selected_chapters") or [],
             "wiki_toc_outline": outline_raw,
             "catalog_note": plan_context.get("catalog_note") or "",
@@ -289,7 +302,18 @@ class OpenAICompatLLM:
             "\n1. 第一行以「结论：」开头，用一句话直接给出结论（先答是/否/可否/数量/时限等，勿铺垫）。"
             "\n2. 空一行后写「依据：」，再分条列出原因；每条一行，须带 § 条款号并概括要点。"
             "\n3. 除上述两段外不要写标题、markdown 或客套话。"
+            "\n4. 若问题涉及多项手续（如离职+年假+报销+归还资产），依据段须**分事项**列出，"
+            "并引用对应 §；严格区分原文措辞：「必须/不得」=强制，「应/原则上」=一般要求，"
+            "「建议/可」=非强制。不得把「原则上」写成「必须」。"
         )
+        skill_text = str(context.get("skill_instructions") or "").strip()
+        if skill_text:
+            system += (
+                "\n\n【已启用技能】下面是推理约束，不是新的事实。"
+                "数字、时限、金额仍只能来自问题和条款原文。"
+                "对客正文不要写出技能名称。\n"
+                + skill_text
+            )
         slim = {
             "wiki_leaves": context.get("wiki_leaves"),
             "graph_entities": context.get("graph_entities") or context.get("graph_entity"),
@@ -324,6 +348,35 @@ class OpenAICompatLLM:
         except Exception as exc:
             logger.error("llm compose failed: %s", exc)
             raise LLMError(f"compose failed: {exc}") from exc
+
+    def revise_answer(
+        self,
+        *,
+        question: str,
+        draft: str,
+        evidence_text: str,
+        skill_instructions: str,
+    ) -> str:
+        system = (
+            "你是客服回答的核对模块。先只根据用户问题、条款原文和技能说明，独立得出结论应有的数量或判断，再对照草稿。"
+            "技能说明是推理约束，不是新的事实；数字、时限、金额只能来自问题和条款原文。"
+            "草稿若在依据里先给出一个数量，又改用另一个数量作为「结论：」那一行，视为不符合，必须改写。"
+            "不得因为草稿后面的句子能自圆其说就原样返回。"
+            "改写后的正文仍用「结论：」和「依据：」，依据只保留与结论一致的那一个数量，并引用条款号。"
+            "对客正文不要出现技能名称。不要写核对过程。"
+            "只有结论与你独立推出的结果一致时，才原样输出草稿。"
+        )
+        user = json.dumps(
+            {
+                "question": question,
+                "clauses": evidence_text,
+                "skills": skill_instructions,
+                "draft": draft,
+            },
+            ensure_ascii=False,
+        )
+        text = self._text_chat(system, user).strip()
+        return text or draft
 
     def _json_chat(
         self, system: str, user: str, *, max_tokens: int | None = None
@@ -364,6 +417,9 @@ class OpenAICompatLLM:
                 body["format"] = "json"
             else:
                 body["response_format"] = {"type": "json_object"}
+        # Qwen3 / vLLM 推理模型默认关闭 thinking，避免 content=null 且耗尽 max_tokens
+        if self.provider == "openai" and _env_truthy("OPENAI_ENABLE_THINKING", default=False) is False:
+            body["chat_template_kwargs"] = {"enable_thinking": False}
         headers = {"Authorization": f"Bearer {self.api_key}"}
         logger.info(
             "llm chat provider=%s model=%s json=%s",
@@ -407,8 +463,14 @@ class OpenAICompatLLM:
             msg = str(last_exc) if last_exc else "rate limit or network after retries"
             raise LLMError(f"HTTP chat failed: {msg}") from last_exc
         try:
-            choice = data["choices"][0]["message"]["content"]
-        except (KeyError, IndexError, TypeError) as exc:
+            message = data["choices"][0]["message"]
+            choice = message.get("content")
+            if not (isinstance(choice, str) and choice.strip()):
+                # 部分推理模型把正文放在 reasoning
+                alt = message.get("reasoning") or message.get("reasoning_content")
+                if isinstance(alt, str) and alt.strip():
+                    choice = alt
+        except (KeyError, IndexError, TypeError, AttributeError) as exc:
             raise LLMError(f"unexpected API response: {data!r}") from exc
         if not isinstance(choice, str):
             raise LLMError("unexpected message content type")
@@ -424,6 +486,13 @@ class OpenAICompatLLM:
         except Exception:
             pass
         return choice
+
+
+def _env_truthy(name: str, *, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
 
 
 def _infer_provider(base_url: str) -> ProviderKind:

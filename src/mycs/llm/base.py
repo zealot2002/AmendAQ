@@ -33,6 +33,7 @@ class AgentLLM(Protocol):
         chapters_in_batch: list[dict[str, object]],
         already_selected: list[dict[str, str]],
         batches_remaining: int,
+        composite_query: bool = False,
     ) -> dict[str, object]: ...
 
     def compose_answer(
@@ -40,3 +41,12 @@ class AgentLLM(Protocol):
         understood: UnderstandResult,
         context: dict[str, object],
     ) -> tuple[str, dict[str, object]]: ...
+
+    def revise_answer(
+        self,
+        *,
+        question: str,
+        draft: str,
+        evidence_text: str,
+        skill_instructions: str,
+    ) -> str: ...

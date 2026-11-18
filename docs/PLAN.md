@@ -81,6 +81,31 @@ flowchart TB
 | `ToolRegistry` | `find_wiki_policies`、`get_wiki_policy`、`get_case` 等对 SQLite 的薄封装 |
 | `Verifier` | 对照 Wiki `evidence` 与 Domain API 返回值；**不以 LLM 自证** |
 | `AgentLoop` | 调用 LLM（Mock 或 Ollama）、驱动上列组件 |
+| 回答技能插槽 | 按触发词选中外挂技能，把说明交给组答与核对；**不含领域公式** |
+
+### 回答技能：公式在外挂，loop 只留插槽
+
+客服主链保持通用。领域里的数量公式、口径和推理约束不写进 `AgentLoop`，也不做成 Python 计算器。需要专用推理时，外挂一份 `SKILL.md`。换手册、换行业只加技能，不改主链。
+
+插槽只做三件事：
+
+1. 用**问题文本**和**已检索条款文本**匹配技能 frontmatter 里的触发词。
+2. 命中后，把技能说明注入组答。说明是推理约束，不是新的事实；数字、时限、金额仍只能来自问题和条款原文。
+3. 技能声明 `revise: true` 时，再让模型对照条款原文核对一次草稿。未命中任何技能时，主链与没有技能时相同。
+
+| 项 | 约定 |
+|----|------|
+| 技能文件 | 每个技能一个目录，内含 `SKILL.md`（frontmatter + 说明正文） |
+| 加载顺序 | 内置 `src/mycs/skills/packs/` → 仓库 `skills/` → `MYCS_SKILLS_DIR`；同名以后加载的为准 |
+| `question_any` | 问题里命中任一词 |
+| `evidence_any` | 已检索条款里命中任一词 |
+| 两边都写了 | 必须同时命中才启用 |
+| 两边都空 | 不自动启用 |
+| 代码 | `src/mycs/skills/loader.py` 加载与匹配；`src/mycs/agent/loop.py` 只调用插槽 |
+
+内置示例 `capped-quantity`：条款同时给出新增数量和上限时，结论为「已有数量 + 新增数量，且不得超过上限」。年假结转只是它的一个命中场景，不是代码分支。
+
+这和「领域状态 API」是两条插槽：API 接入办件、工单等动态事实；技能接入推理约束。`Verifier` 仍只做确定性比对，不用技能说明代替条款原文。
 
 ```text
 M1  手写 AgentLoop + MockLLM + trace JSON           → 博文 02

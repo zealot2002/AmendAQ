@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from mycs.ui.trace_kinds import resolve_step_kind
@@ -40,6 +41,23 @@ def enrich_display(step: str, payload: dict[str, Any], *, question: str) -> dict
     return out
 
 
+def _llm_label(p: dict[str, Any] | None = None) -> str:
+    """Show actual model name in UI (avoid hardcoded GLM)."""
+    if isinstance(p, dict):
+        calls = p.get("llm_calls")
+        if isinstance(calls, list):
+            for call in calls:
+                if isinstance(call, dict):
+                    model = str(call.get("model") or "").strip()
+                    if model:
+                        return model
+    for key in ("OPENAI_MODEL", "GLM_MODEL", "GROQ_MODEL"):
+        model = (os.environ.get(key) or "").strip()
+        if model:
+            return model
+    return "大模型"
+
+
 def _narrate(step: str, p: dict[str, Any], *, question: str) -> dict[str, str]:
     if step == "understand":
         intent = str(p.get("intent") or "")
@@ -47,7 +65,7 @@ def _narrate(step: str, p: dict[str, Any], *, question: str) -> dict[str, str]:
         doc_name = str(p.get("graph_document_title") or "").strip()
         doc_label = doc_name or doc_id or "（未指定）"
         return {
-            "summary": "调用 GLM：识别问题类型、关联手册（本步会消耗大模型配额）。",
+            "summary": f"调用 {_llm_label(p)}：识别问题类型、关联手册（本步会消耗大模型配额）。",
             "input": _clip(question, 500),
             "output": f"类型：{_INTENT_ZH.get(intent, intent)}；手册：{doc_label}",
         }
@@ -55,6 +73,13 @@ def _narrate(step: str, p: dict[str, Any], *, question: str) -> dict[str, str]:
     if step == "toc_drill":
         mode = str(p.get("mode") or "")
         if mode == "pipeline_skip":
+            reason = str(p.get("reason") or "")
+            if reason == "composite_query_skip_drill":
+                return {
+                    "summary": "编排：识别为综合/多事项问题，跳过「逐层点选到单条」以免漏章。",
+                    "input": _clip(question, 280),
+                    "output": str(p.get("detail") or "将分批选章（4/5/11 等）"),
+                }
             return {
                 "summary": "编排：根据规则决定目录策略（不调大模型）。",
                 "input": _clip(question, 280),
@@ -74,6 +99,26 @@ def _narrate(step: str, p: dict[str, Any], *, question: str) -> dict[str, str]:
                 "input": f"层级 {p.get('level', '—')}",
                 "output": label or str(p.get("reason") or ""),
             }
+        if mode == "scope_release":
+            return {
+                "summary": "编排：当前章不足以作答，解除目录范围锁定，改分批选章检索。",
+                "input": _clip(question, 240),
+                "output": str(p.get("reason") or p.get("detail") or "—"),
+            }
+        if mode == "sibling_expand":
+            sibs = p.get("siblings") or []
+            labels = "、".join(
+                f"{s.get('section_ref', '')} {s.get('title', '')}".strip()
+                for s in sibs
+                if isinstance(s, dict)
+            )
+            picked = p.get("picked") if isinstance(p.get("picked"), dict) else {}
+            picked_label = f"{picked.get('section_ref', '')} {picked.get('title', '')}".strip()
+            return {
+                "summary": "编排：同章相关条款一并纳入检索（不调大模型）。",
+                "input": f"下钻落到：{picked_label or '—'}",
+                "output": f"追加：{labels or '—'}",
+            }
         if mode == "llm_pick":
             choices = p.get("choices") or []
             opts = "、".join(
@@ -92,7 +137,7 @@ def _narrate(step: str, p: dict[str, Any], *, question: str) -> dict[str, str]:
                 str(pick_id or "—"),
             )
             return {
-                "summary": f"调用 GLM：在第 {p.get('level', '?')} 层目录中选一继续（本步消耗大模型）。",
+                "summary": f"调用 {_llm_label(p)}：在第 {p.get('level', '?')} 层目录中选一继续（本步消耗大模型）。",
                 "input": f"可选项：{opts or '—'}",
                 "output": f"选择：{pick_label}；说明：{dec.get('reason') or '—'}",
             }
@@ -142,7 +187,7 @@ def _narrate(step: str, p: dict[str, Any], *, question: str) -> dict[str, str]:
         }.get(action, action)
         picked = "、".join(str(r) for r in refs) if refs else "（本批未选章）"
         return {
-            "summary": f"调用 GLM：章级目录第 {bi}/{bt} 批（每批一次大模型）。",
+            "summary": f"调用 {_llm_label(p)}：章级目录第 {bi}/{bt} 批（每批一次大模型）。",
             "input": f"本批章：{offered_txt or '—'}",
             "output": f"{action_zh}；选中 {picked}。{reason}".strip(),
         }
@@ -156,9 +201,13 @@ def _narrate(step: str, p: dict[str, Any], *, question: str) -> dict[str, str]:
         doc_id = str(p.get("document_id") or "").strip()
         doc_label = doc_name or doc_id or "—"
         return {
-            "summary": "读库：组装交给 Plan 的目录摘要（SQLite，不调大模型）。"
-            if src != "tool_outline"
-            else "读库：Plan 前目录摘要（部分数据来自上一步知识检索）。",
+            "summary": (
+                "读库：同章相关条款已并入目录摘要（SQLite，不调大模型）。"
+                if src == "sibling_expand"
+                else "读库：组装交给 Plan 的目录摘要（SQLite，不调大模型）。"
+                if src != "tool_outline"
+                else "读库：Plan 前目录摘要（部分数据来自上一步知识检索）。"
+            ),
             "input": f"手册：{doc_label}；方式：{_OUTLINE_SOURCE_ZH.get(src, src or '—')}",
             "output": (
                 f"共 {n} 条节点，合法 leaf {int(p.get('valid_leaf_count') or 0)} 个；"
@@ -177,7 +226,7 @@ def _narrate(step: str, p: dict[str, Any], *, question: str) -> dict[str, str]:
             lines.append(f"{i}. {_GAP_ZH.get(field, field)}")
         body = "\n".join(lines) if lines else "（空计划）"
         return {
-            "summary": "调用 GLM：把目录上下文转成「知识缺口」列表（本步消耗大模型）。",
+            "summary": f"调用 {_llm_label(p)}：把目录上下文转成「知识缺口」列表（本步消耗大模型）。",
             "input": _clip(question, 400),
             "output": body,
         }
@@ -243,6 +292,28 @@ def _narrate(step: str, p: dict[str, Any], *, question: str) -> dict[str, str]:
             "output": out,
         }
 
+    if step == "skill":
+        skills = p.get("skills") or []
+        names = "、".join(
+            str(s.get("name") or "")
+            for s in skills
+            if isinstance(s, dict) and s.get("name")
+        )
+        return {
+            "summary": "编排：按问题与已检索条款启用技能（不把业务公式写进主链）。",
+            "input": _clip(question, 240),
+            "output": names or "（无）",
+        }
+
+    if step == "skill_revise":
+        names = "、".join(str(s) for s in (p.get("skills") or []))
+        changed = "已按技能说明改写结论" if p.get("changed") else "草稿与技能说明一致，未改"
+        return {
+            "summary": f"调用 {_llm_label(p)}：按技能说明核对结论是否能从条款原文推出。",
+            "input": names or "—",
+            "output": changed,
+        }
+
     if step == "verify":
         ok = p.get("ok")
         return {
@@ -254,7 +325,7 @@ def _narrate(step: str, p: dict[str, Any], *, question: str) -> dict[str, str]:
     if step == "answer":
         text = str(p.get("text") or "")
         return {
-            "summary": "调用 GLM：根据检索到的条款生成最终回复（本步消耗大模型）。",
+            "summary": f"调用 {_llm_label(p)}：根据检索到的条款生成最终回复（本步消耗大模型）。",
             "input": "条款摘要 + 原问题",
             "output": _clip(text, 2000),
         }

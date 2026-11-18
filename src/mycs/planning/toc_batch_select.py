@@ -7,6 +7,7 @@ from typing import Any, Protocol
 from mycs.knowledge.service import KnowledgeService
 from mycs.log import get_logger
 from mycs.log_detail import log_step
+from mycs.planning.chapter_hints import is_composite_handbook_query, seed_chapter_refs_from_question
 from mycs.ui.trace_llm_capture import take_llm_captures
 
 logger = get_logger(__name__)
@@ -25,6 +26,7 @@ class TocCatalogReviewer(Protocol):
         chapters_in_batch: list[dict[str, Any]],
         already_selected: list[dict[str, str]],
         batches_remaining: int,
+        composite_query: bool = False,
     ) -> dict[str, Any]: ...
 
 
@@ -65,6 +67,18 @@ def run_toc_batch_chapter_select(
     batches = [chapters[i : i + batch_size] for i in range(0, len(chapters), batch_size)]
     selected_refs: list[str] = []
     selected_set: set[str] = set()
+    composite = is_composite_handbook_query(question)
+    for ref in seed_chapter_refs_from_question(question, chapters):
+        if ref not in selected_set:
+            selected_set.add(ref)
+            selected_refs.append(ref)
+    if selected_refs:
+        log_step(
+            logger,
+            "toc_batch_keyword_seed",
+            composite=composite,
+            seeded=selected_refs,
+        )
 
     log_step(
         logger,
@@ -95,6 +109,7 @@ def run_toc_batch_chapter_select(
             chapters_in_batch=batch,
             already_selected=already,
             batches_remaining=batches_remaining,
+            composite_query=composite,
         )
         action = str(decision.get("action") or "continue").lower()
         refs = [str(r) for r in (decision.get("section_refs") or []) if r]
@@ -124,9 +139,19 @@ def run_toc_batch_chapter_select(
                 selected_refs.append(ref)
 
         if action in ("done", "stop"):
-            result.selected_section_refs = selected_refs
-            result.reason = reason or "done"
-            return result
+            if batches_remaining > 0:
+                log_step(
+                    logger,
+                    "toc_batch_ignore_early_done",
+                    batch_index=batch_idx + 1,
+                    batches_remaining=batches_remaining,
+                    composite=composite,
+                    reason=reason,
+                )
+            else:
+                result.selected_section_refs = selected_refs
+                result.reason = reason or "done"
+                return result
 
         if action in ("pick", "select") and refs and batches_remaining == 0:
             result.selected_section_refs = selected_refs
@@ -136,7 +161,10 @@ def run_toc_batch_chapter_select(
         # continue / next_batch: proceed to next batch
 
     result.selected_section_refs = selected_refs
-    if not selected_refs:
+    if composite and len(selected_refs) < 2:
+        result.selected_section_refs = [str(c.get("section_ref") or "") for c in chapters if c.get("section_ref")]
+        result.reason = "composite_fallback_all_chapters"
+    elif not selected_refs:
         result.selected_section_refs = [str(c.get("section_ref") or "") for c in chapters if c.get("section_ref")]
         result.reason = "fallback_all_chapters"
     else:

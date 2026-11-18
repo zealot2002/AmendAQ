@@ -14,8 +14,21 @@ from mycs.models import AgentRunResult, KnowledgeRequirement, KnowledgeSource, T
 from mycs.planning.plan_schema import apply_toc_section_whitelist
 from mycs.planning.resolver import GapResolver
 from mycs.planning.query_intent import is_whole_document_query, search_keywords_for
+from mycs.planning.chapter_hints import (
+    drill_matches_seeded_chapters,
+    is_composite_handbook_query,
+    seed_chapter_refs_from_question,
+    seed_leaf_sections_from_question,
+)
+from mycs.planning.drill_scope import clear_drill_scope, should_release_drill_scope
+from mycs.skills.loader import evidence_text, load_skills, match_skills
+from mycs.planning.sibling_expand import (
+    ensure_by_section_requirements,
+    ensure_scoped_section_requirements,
+    outline_covers_scopes,
+)
 from mycs.planning.toc_batch_select import run_toc_batch_chapter_select
-from mycs.planning.toc_drill import run_toc_drill
+from mycs.planning.toc_drill import TocDrillResult, run_toc_drill
 from mycs.tools.registry import ToolRegistry
 from mycs.ui.trace_kinds import resolve_step_kind
 from mycs.ui.trace_narrative import enrich_display
@@ -115,17 +128,87 @@ class AgentLoop:
 
         plan_context: dict[str, object] = {}
         valid_sections: set[str] = set()
+        composite_q = False
         if understood.intent == "graph_qa" and understood.graph_document_id:
             doc = understood.graph_document_id
             progress("正在对照知识目录定位相关章节…")
             svc = KnowledgeService()
             try:
-                drill = run_toc_drill(
-                    llm=self._llm,
-                    svc=svc,
-                    document_id=doc,
-                    question=understood.raw_question,
+                composite_q = is_composite_handbook_query(understood.raw_question)
+                whole_doc = is_whole_document_query(understood.raw_question)
+                if composite_q and not whole_doc:
+                    drill = TocDrillResult(
+                        reason="composite_query_skip_drill",
+                        trace_events=[
+                            {
+                                "mode": "pipeline_skip",
+                                "reason": "composite_query_skip_drill",
+                                "llm_invoked": False,
+                                "detail": (
+                                    "综合/多事项问题（如离职+年假+报销）不能逐层缩到单一条款；"
+                                    "跳过目录下钻，改为分批选章召回多章。"
+                                ),
+                            }
+                        ],
+                    )
+                    log_step(
+                        logger,
+                        "toc_drill_skip",
+                        document_id=doc,
+                        reason=drill.reason,
+                        composite=True,
+                    )
+                else:
+                    drill = run_toc_drill(
+                        llm=self._llm,
+                        svc=svc,
+                        document_id=doc,
+                        question=understood.raw_question,
+                    )
+
+                scope_released = False
+                top_chapters = [
+                    n
+                    for n in (svc.wiki_list_toc_children(
+                        parent_node_id=svc.wiki_mount_volume_node_id(doc) or "",
+                        document_id=doc,
+                    ).get("nodes") or [])
+                    if n.get("section_ref")
+                ]
+                seeded_chapters = seed_chapter_refs_from_question(
+                    understood.raw_question, top_chapters
                 )
+                facet_mismatch = (
+                    not composite_q
+                    and not whole_doc
+                    and seeded_chapters
+                    and not drill_matches_seeded_chapters(
+                        drill.scope_section_prefix, seeded_chapters
+                    )
+                )
+                if not composite_q and not whole_doc and (
+                    should_release_drill_scope(drill) or facet_mismatch
+                ):
+                    scope_released = True
+                    release_reason = drill.reason
+                    if facet_mismatch:
+                        release_reason = (
+                            f"keyword_chapter_seed={seeded_chapters} "
+                            f"drill_scope={drill.scope_section_prefix}"
+                        )
+                    clear_drill_scope(drill)
+                    drill.trace_events.append(
+                        {
+                            "mode": "scope_release",
+                            "llm_invoked": False,
+                            "reason": release_reason,
+                            "detail": "当前章不足以作答，解除范围锁定，改分批选章检索。",
+                        }
+                    )
+                    logger.info(
+                        "joyjoy: drill scope released reason=%s",
+                        (release_reason or "")[:160],
+                    )
 
                 for drill_ev in drill.trace_events:
                     emit("toc_drill", drill_ev)
@@ -139,12 +222,20 @@ class AgentLoop:
                 ]
                 if drill.scope_section_prefix:
                     plan_context["wiki_scope_section_prefix"] = drill.scope_section_prefix
+                if drill.scope_section_refs:
+                    plan_context["wiki_scope_section_refs"] = list(drill.scope_section_refs)
 
-                whole_doc = is_whole_document_query(understood.raw_question)
-                use_batch_catalog = whole_doc or drill.reason in (
-                    "whole_document_query_skip_drill",
-                    "no_mount",
-                    "no_children",
+                use_batch_catalog = (
+                    whole_doc
+                    or composite_q
+                    or scope_released
+                    or drill.reason
+                    in (
+                        "whole_document_query_skip_drill",
+                        "composite_query_skip_drill",
+                        "no_mount",
+                        "no_children",
+                    )
                 )
 
                 if drill.scope_node_id and not whole_doc and not use_batch_catalog:
@@ -170,6 +261,39 @@ class AgentLoop:
                             "result_raw": branch,
                         },
                     )
+                    sib_ids = [
+                        str(n["node_id"])
+                        for n in drill.sibling_nodes
+                        if n.get("node_id")
+                    ]
+                    if sib_ids:
+                        leaves = self._tools.call("wiki_get_leaves", node_ids=sib_ids)
+                        leaf_req = KnowledgeRequirement(
+                            field="wiki.toc.leaves",
+                            source=KnowledgeSource.WIKI,
+                            params={"node_ids": sib_ids},
+                        )
+                        self._resolver.after_tool(leaf_req, "wiki_get_leaves", leaves, context)
+                        emit(
+                            "tool",
+                            {
+                                "gap": "wiki.toc.leaves",
+                                "source": "wiki",
+                                "api": "wiki_get_leaves",
+                                "params": {"node_ids": sib_ids},
+                                "result": summarize_tool_result("wiki_get_leaves", leaves),
+                                "result_raw": leaves,
+                            },
+                        )
+                    if len(drill.scope_section_refs) > 1:
+                        context["wiki_scope_section_refs"] = list(drill.scope_section_refs)
+                        context.pop("wiki_scope_section_prefix", None)
+                        plan_context["wiki_scope_section_refs"] = list(drill.scope_section_refs)
+                        plan_context.pop("wiki_scope_section_prefix", None)
+                        logger.info(
+                            "joyjoy: search scope widened to sibling sections %s",
+                            drill.scope_section_refs,
+                        )
 
                 if use_batch_catalog:
                     progress("正在分批浏览手册章节目录（可继续索要后续批次）…")
@@ -219,8 +343,12 @@ class AgentLoop:
                     )
                     outline = toc.get("nodes") or []
                     prefix = drill.scope_section_prefix or ""
+                    scope_refs = list(drill.scope_section_refs or [])
                     outline_source = "tool_outline"
-                    if prefix:
+                    if len(scope_refs) > 1:
+                        outline = outline_covers_scopes(outline, scope_refs)
+                        outline_source = "sibling_expand"
+                    elif prefix:
                         pref = prefix.rstrip(".")
                         outline = [
                             n
@@ -229,7 +357,7 @@ class AgentLoop:
                             or str(n.get("section_ref") or "").startswith(f"{pref}.")
                         ]
                         outline_source = "local_filter"
-                    scoped = bool(prefix)
+                    scoped = bool(prefix or scope_refs)
 
                 plan_context["wiki_toc_outline"] = outline
                 context["wiki_toc_outline"] = outline
@@ -273,6 +401,45 @@ class AgentLoop:
         if valid_sections:
             requirements = apply_toc_section_whitelist(requirements, valid_sections)
             dropped_guard = max(0, before_count - len(requirements))
+        scope_refs = [
+            str(s)
+            for s in (plan_context.get("wiki_scope_section_refs") or [])
+            if s
+        ]
+        sibling_added = 0
+        if len(scope_refs) > 1:
+            requirements, sibling_added = ensure_scoped_section_requirements(
+                requirements,
+                scope_refs,
+                document_id=understood.graph_document_id,
+            )
+            if sibling_added:
+                logger.info(
+                    "joyjoy: plan supplemented by_section for sibling refs %s (+%s)",
+                    scope_refs,
+                    sibling_added,
+                )
+        composite_added = 0
+        composite_leaf_refs: list[str] = []
+        if composite_q and understood.intent == "graph_qa":
+            outline_for_seed = plan_context.get("wiki_toc_outline") or []
+            composite_leaf_refs = seed_leaf_sections_from_question(
+                understood.raw_question,
+                outline_for_seed,  # type: ignore[arg-type]
+            )
+            if composite_leaf_refs:
+                requirements, composite_added = ensure_by_section_requirements(
+                    requirements,
+                    composite_leaf_refs,
+                    document_id=understood.graph_document_id,
+                    min_refs=1,
+                )
+                if composite_added:
+                    logger.info(
+                        "joyjoy: composite plan supplemented by_section %s (+%s)",
+                        composite_leaf_refs,
+                        composite_added,
+                    )
         requirements = _sort_gaps(requirements)
         if understood.intent == "graph_qa" and before_count:
             emit(
@@ -282,6 +449,10 @@ class AgentLoop:
                     "requirements_before": before_count,
                     "requirements_after": len(requirements),
                     "dropped_by_whitelist": dropped_guard,
+                    "sibling_sections_added": sibling_added,
+                    "composite_sections_added": composite_added,
+                    "composite_leaf_refs": composite_leaf_refs,
+                    "scope_section_refs": scope_refs,
                 },
             )
         emit(
@@ -327,7 +498,7 @@ class AgentLoop:
                     broad = {
                         k: v
                         for k, v in params.items()
-                        if k not in ("entity_id_in", "section_prefix")
+                        if k not in ("entity_id_in", "section_prefix", "section_refs")
                     }
                     broad["query"] = search_keywords_for(context.get("raw_question", ""))
                     broad["limit"] = max(int(broad.get("limit") or 8), 15)
@@ -358,14 +529,63 @@ class AgentLoop:
                 emit("tool", tool_payload)
 
         progress("正在根据检索结果撰写回答…")
+        clauses = evidence_text(context)
+        active_skills = match_skills(load_skills(), understood.raw_question, clauses)
+        if active_skills:
+            context["skill_instructions"] = "\n\n".join(
+                f"## {skill.name}\n{skill.instructions}".strip() for skill in active_skills
+            )
+            logger.info(
+                "joyjoy: answer skills enabled %s",
+                [skill.name for skill in active_skills],
+            )
+            emit(
+                "skill",
+                {
+                    "skills": [
+                        {"name": skill.name, "description": skill.description, "revise": skill.revise}
+                        for skill in active_skills
+                    ],
+                    "llm_invoked": False,
+                },
+            )
         log_step(
             logger,
             "agent_compose_start",
             wiki_leaves=len(context.get("wiki_leaves") or []),
             graph_entities=len(context.get("graph_entities") or []),
+            skills=[skill.name for skill in active_skills],
         )
         answer, claims = self._llm.compose_answer(understood, context)
         compose_llm_calls = take_llm_captures()
+        revise_skills = [skill for skill in active_skills if skill.revise]
+        if revise_skills and hasattr(self._llm, "revise_answer"):
+            progress("正在按已启用技能核对结论…")
+            revised = self._llm.revise_answer(
+                question=understood.raw_question,
+                draft=answer,
+                evidence_text=clauses,
+                skill_instructions=str(context.get("skill_instructions") or ""),
+            )
+            revise_calls = take_llm_captures()
+            compose_llm_calls = compose_llm_calls + revise_calls
+            changed = revised.strip() != answer.strip()
+            logger.info(
+                "joyjoy: skill revise skills=%s changed=%s",
+                [skill.name for skill in revise_skills],
+                changed,
+            )
+            emit(
+                "skill_revise",
+                {
+                    "skills": [skill.name for skill in revise_skills],
+                    "changed": changed,
+                    "llm_invoked": True,
+                    "llm_calls": revise_calls,
+                },
+            )
+            if revised.strip():
+                answer = revised.strip()
         progress("正在核对回答是否有据…")
         verify = self._run_verify(understood, context, claims, answer=answer)
         emit(
