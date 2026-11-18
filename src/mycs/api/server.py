@@ -13,12 +13,21 @@ logger = get_logger(__name__)
 
 
 def main() -> None:
+    from mycs.env_loader import load_project_dotenv
+    from mycs.llm.factory import resolve_llm_backend, resolve_llm_model_name
+
     ensure_localhost_no_proxy()
+    load_project_dotenv(override=True)
     configure_logging()
     host = os.environ.get("MYCS_API_HOST", "127.0.0.1")
     port = int(os.environ.get("MYCS_API_PORT", "8765"))
     paths = runtime_paths()
     logger.info("mycs-api starting host=%s port=%s", host, port)
+    logger.info(
+        "joyjoy: llm backend=%s display=%s",
+        resolve_llm_backend(),
+        resolve_llm_model_name(),
+    )
     logger.info("paths db=%s uploads=%s traces=%s kg=%s", paths["db"], paths["uploads"], paths["traces"], paths["kg"])
     uvicorn.run(
         "mycs.api.app:create_app",

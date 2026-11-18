@@ -5,7 +5,7 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
-from mycs.graph.extract import SectionGraphBuilder
+from mycs.graph.extract import SectionGraphBuilder, knowledge_graph_from_outline_roots
 from mycs.graph.model import KnowledgeGraph
 from mycs.graph.persist import export_graph_json, persist_graph
 from mycs.log import get_logger
@@ -75,26 +75,14 @@ def ensure_mount(
     return mount_id
 
 
-def ingest_document_toc_draft(
+def _write_draft_toc_nodes(
     conn: sqlite3.Connection,
-    text: str,
     *,
+    mount_id: str,
+    mount_node_id: str,
     document_id: str,
-    title: str,
-    source_uri: str,
-) -> dict[str, Any]:
-    """Parse outline, write draft TOC nodes, sync kg graph."""
-    mount_id = ensure_mount(conn, document_id=document_id, display_title=title)
-    conn.execute(
-        "DELETE FROM wiki_toc_node WHERE mount_id = ? AND status = 'draft'",
-        (mount_id,),
-    )
-    roots = parse_outline_from_text(text, source_uri=source_uri)
-    mount_row = conn.execute(
-        "SELECT parent_node_id FROM wiki_document_mount WHERE mount_id = ?",
-        (mount_id,),
-    ).fetchone()
-    mount_node_id = mount_row["parent_node_id"]
+    roots: list[OutlineNode],
+) -> int:
     ts = _now()
     count = 0
     sort_ch = 0
@@ -150,20 +138,61 @@ def ingest_document_toc_draft(
                 ),
             )
             count += 1
+    return count
 
-    builder = SectionGraphBuilder()
-    graph: KnowledgeGraph = builder.extract(
-        text,
-        document_id=document_id,
-        title=title,
-        source_uri=source_uri,
+
+def ingest_document_toc_from_roots(
+    conn: sqlite3.Connection,
+    roots: list[OutlineNode],
+    *,
+    document_id: str,
+    title: str,
+    source_uri: str,
+    graph_from: str = "outline",
+    source_text: str | None = None,
+    leaf_quotes: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """Write draft TOC from pre-built outline; sync kg graph."""
+    mount_id = ensure_mount(conn, document_id=document_id, display_title=title)
+    conn.execute(
+        "DELETE FROM wiki_toc_node WHERE mount_id = ? AND status = 'draft'",
+        (mount_id,),
     )
+    mount_row = conn.execute(
+        "SELECT parent_node_id FROM wiki_document_mount WHERE mount_id = ?",
+        (mount_id,),
+    ).fetchone()
+    mount_node_id = mount_row["parent_node_id"]
+    count = _write_draft_toc_nodes(
+        conn,
+        mount_id=mount_id,
+        mount_node_id=mount_node_id,
+        document_id=document_id,
+        roots=roots,
+    )
+    if graph_from == "section_builder" and source_text:
+        builder = SectionGraphBuilder()
+        graph = builder.extract(
+            source_text,
+            document_id=document_id,
+            title=title,
+            source_uri=source_uri,
+        )
+    else:
+        graph = knowledge_graph_from_outline_roots(
+            roots,
+            document_id=document_id,
+            title=title,
+            source_uri=source_uri,
+            leaf_quotes=leaf_quotes,
+        )
     persist_graph(graph, conn=conn)
     logger.info(
-        "joyjoy: draft toc mount=%s nodes=%s entities=%s",
+        "joyjoy: draft toc mount=%s nodes=%s entities=%s graph_from=%s",
         mount_id,
         count,
         len(graph.entities),
+        graph_from,
     )
     return {
         "mount_id": mount_id,
@@ -172,6 +201,27 @@ def ingest_document_toc_draft(
         "entities": len(graph.entities),
         "status": "draft",
     }
+
+
+def ingest_document_toc_draft(
+    conn: sqlite3.Connection,
+    text: str,
+    *,
+    document_id: str,
+    title: str,
+    source_uri: str,
+) -> dict[str, Any]:
+    """Parse outline, write draft TOC nodes, sync kg graph."""
+    roots = parse_outline_from_text(text, source_uri=source_uri)
+    return ingest_document_toc_from_roots(
+        conn,
+        roots,
+        document_id=document_id,
+        title=title,
+        source_uri=source_uri,
+        graph_from="section_builder",
+        source_text=text,
+    )
 
 
 def publish_mount(

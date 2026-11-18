@@ -6,8 +6,8 @@ from typing import Any
 
 from mycs.db.connection import connect, get_db_path
 from mycs.document_id import generate_document_id
-from mycs.graph.extract import ingest_txt_file
 from mycs.knowledge.service import KnowledgeService, ensure_database
+from mycs.ui.ingest_document import ingest_document_file, run_ingest_uploaded
 from mycs.log import get_logger
 from mycs.log_detail import log_step
 from mycs.paths import uploads_dir
@@ -97,6 +97,26 @@ def save_upload_bytes(filename: str, content: bytes) -> dict[str, Any]:
     suffix = Path(filename or "upload.txt").suffix or ".txt"
     dest = _ensure_upload_dir() / f"{doc}{suffix}"
     dest.write_bytes(content)
+    from mycs.document_display import infer_handbook_display_title
+    from mycs.wiki.toc_persist import ensure_mount
+
+    try:
+        text = dest.read_text(encoding="utf-8")
+        title = infer_handbook_display_title(
+            document_id=doc,
+            path=dest,
+            text=text,
+            stored_title=filename,
+        )
+        conn = connect(get_db_path())
+        try:
+            ensure_mount(conn, document_id=doc, display_title=title)
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as exc:
+        logger.warning("joyjoy: upload ensure_mount failed doc=%s: %s", doc, exc)
+
     set_active_document_id(doc)
     logger.info("upload saved document_id=%s path=%s bytes=%s", doc, dest, len(content))
     return {
@@ -119,27 +139,13 @@ def save_upload(file_obj: Any, document_id: str) -> tuple[str, str]:
 
 def ingest_uploaded(document_id: str) -> tuple[str, str]:
     doc = (document_id or "").strip() or resolve_active_document_id()
-    if not doc:
-        return workflow_markdown("", "❌ 请先上传文档"), doc
-    candidates = list(_ensure_upload_dir().glob(f"{doc}*"))
-    if not candidates:
-        return workflow_markdown(doc, "❌ 请先上传文档"), doc
-    src = max(candidates, key=lambda p: p.stat().st_mtime)
     ensure_database()
-    log_step(logger, "workflow_ingest_start", document_id=doc, source=str(src))
-    ingest_txt_file(src, document_id=doc)
-    set_active_document_id(doc)
-    st = workflow_state(doc)
-    log_step(
-        logger,
-        "workflow_ingest_done",
-        document_id=doc,
-        draft_nodes=st.get("draft_nodes"),
-        mount_id=st.get("mount_id"),
-        step=st.get("current_step"),
-    )
+    try:
+        run_ingest_uploaded(doc)
+    except ValueError as exc:
+        return workflow_markdown(doc, f"❌ {exc}"), doc
     outline = wiki_admin._outline_md(doc, f"{WIKI_DRAFT}已生成")
-    header = workflow_markdown(doc, f"✅ Ingest 完成：`{src.name}`")
+    header = workflow_markdown(doc, "✅ Ingest 完成")
     return header + "\n\n---\n\n" + outline, doc
 
 
@@ -177,8 +183,8 @@ def workflow_markdown(document_id: str, extra: str = "") -> str:
         lines.append(f"{icons.get(status, '⬜')} {titles[key]}")
     lines.append("")
     nxt = {
-        "upload": "请上传 .txt",
-        "ingest_draft": "点击「解析并生成 Wiki 草稿」",
+        "upload": "请上传 .txt 或 .md",
+        "ingest_draft": "点击「整理目录」生成 Wiki 草稿",
         "review": f"检查下方{WIKI}树（当前为{WIKI_DRAFT}），编辑后发布",
         "publish": f"点击「发布 {WIKI}」",
         "qa_ready": "切换到「问答」Tab 提问",

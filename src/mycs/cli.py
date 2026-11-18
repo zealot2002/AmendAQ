@@ -122,6 +122,55 @@ def _cmd_ingest_txt(argv: list[str]) -> int:
     return 0
 
 
+def _cmd_ingest_compile(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="mycs ingest compile")
+    parser.add_argument("path", type=Path, help="Path to .md or .txt FAQ / document")
+    parser.add_argument("--doc-id", dest="doc_id", default=None)
+    parser.add_argument(
+        "--publish",
+        action="store_true",
+        help="After ingest, publish wiki TOC for this document",
+    )
+    parser.add_argument(
+        "--canonical-out",
+        type=Path,
+        default=None,
+        help="Override path for canonical JSON (default data/ingest/<doc_id>.canonical.json)",
+    )
+    args = parser.parse_args(argv)
+    if not args.path.is_file():
+        print(f"file not found: {args.path}", file=sys.stderr)
+        return 1
+    ensure_database()
+    try:
+        from mycs.wiki.ingest_compile import ingest_compile_file
+
+        meta = ingest_compile_file(
+            args.path,
+            document_id=args.doc_id,
+            llm=None,
+            rules_only=True,
+            canonical_out=args.canonical_out,
+            publish=args.publish,
+        )
+    except ValueError as exc:
+        logger.error("ingest compile validation: %s", exc)
+        print(f"校验失败: {exc}", file=sys.stderr)
+        return 2
+    doc = meta["document_id"]
+    print(
+        f"joyjoy: compiled document_id={doc} chapters={meta.get('chapters')} "
+        f"leaves={meta.get('leaves')} draft_nodes={meta.get('draft_nodes')} "
+        f"(Wiki 草稿 — 请审核后 publish)"
+    )
+    if meta.get("ingest_notes"):
+        print("joyjoy: ingest_notes:")
+        for note in meta["ingest_notes"]:
+            print(f"  - {note}")
+    print(f"canonical: {meta.get('canonical_json')}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(argv) if argv is not None else sys.argv[1:]
     if argv and argv[0] == "reset-data":
@@ -132,6 +181,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_bootstrap()
     if len(argv) >= 2 and argv[0] == "ingest" and argv[1] == "txt":
         return _cmd_ingest_txt(argv[2:])
+    if len(argv) >= 2 and argv[0] == "ingest" and argv[1] == "compile":
+        return _cmd_ingest_compile(argv[2:])
     if len(argv) >= 2 and argv[0] == "wiki" and argv[1] == "publish":
         return _cmd_wiki_publish(argv[2:])
 
@@ -167,6 +218,7 @@ def main(argv: list[str] | None = None) -> int:
         print("  uv run mycs bootstrap", file=sys.stderr)
         print("  export MYCS_GRAPH_DOCUMENT=<doc_id>", file=sys.stderr)
         print("  uv run mycs ingest txt your.txt --doc-id <doc_id>", file=sys.stderr)
+        print("  uv run mycs ingest compile handbook.md --doc-id <doc_id>", file=sys.stderr)
         return 1
 
     try:

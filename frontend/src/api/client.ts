@@ -1,9 +1,18 @@
 import axios from "axios";
+import { formatApiError } from "./httpError";
 
 const http = axios.create({
   baseURL: "/api",
   timeout: 120_000,
 });
+
+http.interceptors.response.use(
+  (r) => r,
+  (err) => {
+    err.message = formatApiError(err);
+    return Promise.reject(err);
+  },
+);
 
 export interface Mount {
   document_id: string;
@@ -20,6 +29,8 @@ export interface TocNode {
   section_ref: string;
   title: string;
   summary: string;
+  /** FAQ / 手册正文；问答与审核读此字段 */
+  body?: string;
   depth: number;
   status: string;
 }
@@ -73,8 +84,69 @@ export async function uploadDocument(file: File) {
 }
 
 export async function ingestDocument(documentId?: string) {
-  const { data } = await http.post("/ingest", documentId ? { document_id: documentId } : {});
+  const { data } = await http.post(
+    "/ingest",
+    documentId ? { document_id: documentId } : {},
+    { timeout: 600_000 },
+  );
   return data;
+}
+
+export type IngestProgressPayload = { stage: string; percent: number; message: string };
+
+export async function ingestDocumentStream(
+  documentId: string,
+  handlers: {
+    onProgress?: (payload: IngestProgressPayload) => void;
+  },
+): Promise<{ document_id: string; workflow: WorkflowState; toc: unknown }> {
+  const res = await fetch("/api/ingest/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ document_id: documentId }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+  if (!res.body) {
+    throw new Error("stream body missing");
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finalResult: { document_id: string; workflow: WorkflowState; toc: unknown } | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const chunks = buffer.split("\n\n");
+    buffer = chunks.pop() || "";
+    for (const chunk of chunks) {
+      const line = chunk.trim();
+      if (!line.startsWith("data:")) continue;
+      const raw = line.slice(5).trim();
+      if (!raw) continue;
+      const msg = JSON.parse(raw) as {
+        type: string;
+        payload?: IngestProgressPayload;
+        result?: { document_id: string; workflow: WorkflowState; toc: unknown };
+        message?: string;
+      };
+      if (msg.type === "progress" && msg.payload) {
+        handlers.onProgress?.(msg.payload);
+      } else if (msg.type === "done" && msg.result) {
+        finalResult = msg.result;
+      } else if (msg.type === "error") {
+        throw new Error(msg.message || "整理目录失败");
+      }
+    }
+  }
+  if (!finalResult) {
+    throw new Error("整理未完成");
+  }
+  return finalResult;
 }
 
 export async function ingestPath(path: string, documentId?: string) {
@@ -94,8 +166,17 @@ export async function fetchToc(documentId: string) {
   return data;
 }
 
-export async function patchNode(nodeId: string, title: string, summary: string) {
-  const { data } = await http.patch(`/nodes/${encodeURIComponent(nodeId)}`, { title, summary });
+export async function patchNode(
+  nodeId: string,
+  title: string,
+  summary: string,
+  body?: string,
+) {
+  const { data } = await http.patch(`/nodes/${encodeURIComponent(nodeId)}`, {
+    title,
+    summary,
+    body,
+  });
   return data;
 }
 

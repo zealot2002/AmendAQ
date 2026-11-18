@@ -6,7 +6,7 @@ WIKI_PUBLISHED = "已发布"
 KG = "知识图谱"
 
 STEP_LABELS_UI = {
-    "upload": "1. 上传文档 (.txt)",
+    "upload": "1. 上传文档 (.txt / .md)",
     "ingest_draft": f"2. 解析入库 → {WIKI_DRAFT}（{WIKI} + {KG}）",
     "review": f"3. 人工审核（编辑节点，仍为{WIKI_DRAFT}）",
     "publish": f"4. 发布 {WIKI}（{WIKI_DRAFT} → {WIKI_PUBLISHED}）",

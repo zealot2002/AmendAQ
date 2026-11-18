@@ -64,15 +64,36 @@ load_user_llm_env() {
   fi
 }
 
+# 项目 .env 优先于 ~/.zshrc 里的旧 OPENAI_MODEL=Qwen 等
+load_project_env() {
+  if [[ -f "$ROOT/.env" ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "$ROOT/.env"
+    set +a
+    log "已加载 $ROOT/.env（覆盖 shell 中的 MYCS_LLM / GLM_*）"
+  else
+    if [[ -n "${GLM_API_KEY:-}${ZHIPUAI_API_KEY:-}" ]]; then
+      export MYCS_LLM=glm
+      export GLM_MODEL="${GLM_MODEL:-glm-4-flash}"
+      log "未发现 .env，但 shell 中有智谱 Key → 强制 MYCS_LLM=glm GLM_MODEL=$GLM_MODEL"
+    else
+      log "未发现 $ROOT/.env，可 cp .env.example .env 并填写 GLM_API_KEY"
+    fi
+  fi
+}
+
 start_api() {
   log "同步 Python 依赖 (web)..."
   uv sync --extra web --extra dev -q
   mkdir -p "$LOG_DIR"
   load_user_llm_env
-  log "启动 API :${API_PORT} → $LOG_DIR/api.log (MYCS_LLM=${MYCS_LLM:-unset})"
+  load_project_env
+  log "启动 API :${API_PORT} → $LOG_DIR/api.log (MYCS_LLM=${MYCS_LLM:-unset} GLM_MODEL=${GLM_MODEL:-unset})"
   (
     cd "$ROOT"
     load_user_llm_env
+    load_project_env
     export MYCS_API_HOST="${MYCS_API_HOST:-127.0.0.1}"
     export MYCS_API_PORT="$API_PORT"
     exec uv run mycs-api

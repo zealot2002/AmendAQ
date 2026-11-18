@@ -1,68 +1,63 @@
 <template>
-  <div class="page">
-    <el-alert type="warning" :closable="false" show-icon class="hint">
-      此页适合管理员：从服务器上的文件路径导入。普通用户请在「搭建知识库」里上传即可。
-    </el-alert>
-
-    <el-card shadow="never">
-      <template #header>从服务器文件导入</template>
-      <el-form inline>
-        <el-form-item label="文件在服务器上的位置">
-          <el-input
-            v-model="txtPath"
-            placeholder="例如 docs/员工手册.txt"
-            style="width: 420px"
-          />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" :loading="loading.ingest" @click="ingestFromPath">{{ T.btnParse }}</el-button>
-          <el-button type="success" :loading="loading.publish" @click="publish">{{ T.btnPublish }}</el-button>
-          <el-button @click="loadToc">刷新</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
-    <el-row :gutter="16" class="body">
-      <el-col :span="10">
-        <el-card shadow="never" class="tree-card">
-          <template #header>{{ T.catalog }}（树形）</template>
-          <el-tree
-            v-if="treeData.length"
-            :data="treeData"
-            :props="{ label: 'label', children: 'children' }"
-            node-key="node_id"
-            highlight-current
-            default-expand-all
-            @node-click="onNodeClick"
-          />
-          <el-empty v-else :description="`暂无${T.catalog}，请先${T.btnParse}`" />
+  <div class="page review-page">
+    <el-row :gutter="16" class="review-row">
+      <el-col :span="10" class="review-col">
+        <el-card shadow="never" class="pane-card tree-card">
+          <template #header>
+            <span>目录树</span>
+            <el-button link type="primary" @click="loadToc">刷新</el-button>
+          </template>
+          <div class="pane-scroll">
+            <el-tree
+              v-if="treeData.length"
+              :data="treeData"
+              :props="{ label: 'label', children: 'children' }"
+              node-key="node_id"
+              highlight-current
+              default-expand-all
+              @node-click="onNodeClick"
+            />
+            <el-empty v-else :description="T.catalogEmptyNeedParse" />
+          </div>
         </el-card>
       </el-col>
-      <el-col :span="14">
-        <el-card shadow="never">
-          <template #header>修改这一条</template>
-          <el-form label-width="88px">
-            <el-form-item :label="T.entryCode">
-              <el-input v-model="edit.node_id" readonly />
-            </el-form-item>
-            <el-form-item label="章节号">
-              <el-input v-model="edit.section_ref" readonly />
-            </el-form-item>
-            <el-form-item label="标题">
-              <el-input v-model="edit.title" />
-            </el-form-item>
-            <el-form-item label="摘要">
-              <el-input v-model="edit.summary" type="textarea" :rows="4" />
-            </el-form-item>
-            <el-form-item label="状态">
-              <el-tag :type="edit.status === 'published' ? 'success' : 'warning'">
-                {{ statusLabel(edit.status) }}
-              </el-tag>
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" :loading="loading.save" @click="save">保存修改</el-button>
-            </el-form-item>
-          </el-form>
+      <el-col :span="14" class="review-col">
+        <el-card shadow="never" class="pane-card detail-card">
+          <template #header>
+            <div class="hdr">
+              <span>条目</span>
+              <el-button type="success" size="small" :loading="loading.publish" @click="publish">
+                {{ T.btnPublish }}
+              </el-button>
+            </div>
+          </template>
+          <div class="pane-scroll">
+            <el-form label-width="72px">
+              <el-form-item label="标题">
+                <el-input v-model="edit.title" />
+              </el-form-item>
+              <el-form-item v-if="edit.kind === 'leaf'" :label="T.reviewAnswerLabel">
+                <el-input v-model="edit.body" type="textarea" :rows="12" placeholder="入库的 **答：** 正文" />
+              </el-form-item>
+              <el-alert
+                v-else-if="edit.node_id"
+                type="info"
+                :closable="false"
+                show-icon
+                :title="T.reviewChapterNoAnswer"
+              />
+              <el-form-item label="状态">
+                <el-tag :type="edit.status === 'published' ? 'success' : 'warning'">
+                  {{ statusLabel(edit.status) }}
+                </el-tag>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="loading.save" :disabled="!edit.node_id" @click="save">
+                  保存
+                </el-button>
+              </el-form-item>
+            </el-form>
+          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -71,29 +66,28 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { T } from "@/constants/terminology";
-import {
-  fetchToc,
-  ingestPath,
-  patchNode,
-  publishDocument,
-  type TocNode,
-} from "@/api/client";
+import { fetchToc, patchNode, publishDocument, type TocNode } from "@/api/client";
+import { formatApiError } from "@/api/httpError";
 import { useDocumentId } from "@/composables/useDocumentId";
 import { buildTocTree, type TreeNode } from "@/utils/tocTree";
 
+const route = useRoute();
+const router = useRouter();
 const { documentId, setDocumentId } = useDocumentId();
-const txtPath = ref("docs/星河科技_中文员工手册_知识库测试.txt");
+
 const nodes = ref<TocNode[]>([]);
-const loading = reactive({ ingest: false, publish: false, save: false });
+const loading = reactive({ publish: false, save: false });
 const edit = reactive({
   node_id: "",
   section_ref: "",
+  kind: "",
   title: "",
   summary: "",
+  body: "",
   status: "",
-  kind: "",
 });
 
 interface TreeItem {
@@ -118,6 +112,15 @@ function toTreeItems(list: TreeNode[]): TreeItem[] {
 
 const treeData = computed(() => toTreeItems(buildTocTree(nodes.value)));
 
+function syncDocFromRoute() {
+  const param = String(route.params.documentId || "");
+  if (!param || param === "_") {
+    router.replace({ name: "library" });
+    return;
+  }
+  if (param !== documentId.value) setDocumentId(param);
+}
+
 async function loadToc() {
   const doc = documentId.value.trim();
   if (!doc) return;
@@ -125,35 +128,23 @@ async function loadToc() {
     const data = await fetchToc(doc);
     nodes.value = data.nodes || [];
   } catch (e: unknown) {
-    ElMessage.error(String(e));
+    ElMessage.error(formatApiError(e));
   }
 }
 
-watch(documentId, () => loadToc(), { immediate: true });
+watch(() => route.params.documentId, syncDocFromRoute, { immediate: true });
+watch(documentId, loadToc, { immediate: true });
 
 function onNodeClick(data: TreeItem) {
   const n = nodes.value.find((x) => x.node_id === data.node_id);
   if (!n) return;
   edit.node_id = n.node_id;
   edit.section_ref = n.section_ref;
+  edit.kind = n.kind;
   edit.title = n.title;
   edit.summary = n.summary || "";
+  edit.body = n.body || "";
   edit.status = n.status;
-  edit.kind = n.kind;
-}
-
-async function ingestFromPath() {
-  loading.ingest = true;
-  try {
-    const data = await ingestPath(txtPath.value, documentId.value.trim() || undefined);
-    if (data.document_id) setDocumentId(data.document_id);
-    ElMessage.success(T.msgDraftReady);
-    await loadToc();
-  } catch (e: unknown) {
-    ElMessage.error(String(e));
-  } finally {
-    loading.ingest = false;
-  }
 }
 
 async function publish() {
@@ -163,7 +154,7 @@ async function publish() {
     ElMessage.success(T.msgPublished);
     await loadToc();
   } catch (e: unknown) {
-    ElMessage.error(String(e));
+    ElMessage.error(formatApiError(e));
   } finally {
     loading.publish = false;
   }
@@ -173,11 +164,17 @@ async function save() {
   if (!edit.node_id) return;
   loading.save = true;
   try {
-    await patchNode(edit.node_id, edit.title, edit.summary);
+    const summary =
+      edit.kind === "leaf"
+        ? edit.body.length > 280
+          ? `${edit.body.slice(0, 280)}…`
+          : edit.body
+        : edit.summary;
+    await patchNode(edit.node_id, edit.title, summary, edit.body);
     ElMessage.success("已保存");
     await loadToc();
   } catch (e: unknown) {
-    ElMessage.error(String(e));
+    ElMessage.error(formatApiError(e));
   } finally {
     loading.save = false;
   }
@@ -185,18 +182,62 @@ async function save() {
 </script>
 
 <style scoped>
-.page {
+.review-page {
+  max-width: 1100px;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  box-sizing: border-box;
 }
-.hint {
-  margin-bottom: 0;
+.review-row {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  align-items: stretch;
 }
-.body {
-  margin-top: 0;
+.review-row > :deep(.el-col) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
-.tree-card {
-  min-height: 480px;
+.review-col {
+  min-height: 0;
+}
+.review-col > .pane-card {
+  flex: 1;
+  min-height: 0;
+}
+.pane-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.pane-card :deep(.el-card__header) {
+  flex-shrink: 0;
+}
+.pane-card :deep(.el-card__body) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-top: 8px;
+}
+.pane-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+.detail-card {
+  /* 右侧固定占位，仅各自 pane 内滚动 */
+}
+.hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 </style>

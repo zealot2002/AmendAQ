@@ -74,5 +74,10 @@ export function useDocumentId() {
     { immediate: true },
   );
 
-  return { documentId, documentTitle, paths, setDocumentId, refreshFromServer };
+  function clearDocumentId() {
+    documentId.value = "";
+    documentTitle.value = "";
+  }
+
+  return { documentId, documentTitle, paths, setDocumentId, clearDocumentId, refreshFromServer };
 }

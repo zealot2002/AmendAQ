@@ -1,9 +1,9 @@
 <template>
   <el-container class="admin-root">
-    <el-aside width="220px" class="admin-aside">
+    <el-aside width="200px" class="admin-aside">
       <div class="logo">
         <span class="logo-mark">M</span>
-        <span class="logo-text">mycs 知识库</span>
+        <span class="logo-text">客服知识库</span>
       </div>
       <el-menu
         :default-active="activeMenu"
@@ -12,25 +12,17 @@
         text-color="#bfcbd9"
         active-text-color="#409eff"
       >
-        <el-menu-item index="/workflow">
-          <el-icon><Operation /></el-icon>
-          <span>{{ T.navWorkflow }}</span>
-        </el-menu-item>
-        <el-menu-item index="/wiki">
-          <el-icon><FolderOpened /></el-icon>
-          <span>{{ T.navReview }}</span>
+        <el-menu-item index="/library">
+          <el-icon><Collection /></el-icon>
+          <span>{{ T.navLibraryMgmt }}</span>
         </el-menu-item>
         <el-menu-item index="/chat">
           <el-icon><ChatDotRound /></el-icon>
           <span>{{ T.navChat }}</span>
         </el-menu-item>
-        <el-menu-item index="/mounts">
-          <el-icon><Collection /></el-icon>
-          <span>{{ T.navLibrary }}</span>
-        </el-menu-item>
         <el-menu-item index="/logs">
           <el-icon><Document /></el-icon>
-          <span>运行日志</span>
+          <span>{{ T.navLogs }}</span>
         </el-menu-item>
       </el-menu>
     </el-aside>
@@ -38,13 +30,17 @@
     <el-container class="admin-body">
       <el-header class="admin-header">
         <div class="header-left">
-          <span class="page-title">{{ pageTitle }}</span>
+          <el-breadcrumb separator="/" class="app-breadcrumb">
+            <el-breadcrumb-item
+              v-for="(item, index) in breadcrumbs"
+              :key="index"
+              :to="index < breadcrumbs.length - 1 ? item.to : undefined"
+            >
+              {{ item.label }}
+            </el-breadcrumb-item>
+          </el-breadcrumb>
         </div>
-        <div class="header-right">
-          <el-button :type="open ? 'primary' : 'default'" plain @click="onLogButton">
-            <el-icon><Document /></el-icon>
-            日志
-          </el-button>
+        <div v-if="showHandbookContext" class="header-right">
           <span class="label">{{ T.currentHandbook }}</span>
           <el-tooltip
             v-if="documentId"
@@ -58,7 +54,13 @@
           <el-tag v-else type="info" effect="plain">{{ T.docCodeHint }}</el-tag>
         </div>
       </el-header>
-      <el-main class="admin-main" :class="{ 'admin-main--chat': isChatRoute }">
+      <el-main
+        class="admin-main"
+        :class="{
+          'admin-main--chat': isChatRoute,
+          'admin-main--fill': isFullHeightRoute && !isChatRoute,
+        }"
+      >
         <router-view />
       </el-main>
     </el-container>
@@ -72,20 +74,17 @@ import { computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import GlobalLogDock from "@/components/GlobalLogDock.vue";
 import { T } from "@/constants/terminology";
+import { useAppBreadcrumbs } from "@/composables/useAppBreadcrumbs";
 import { useDocumentId } from "@/composables/useDocumentId";
-import { useLogDock } from "@/composables/useLogDock";
 
 const route = useRoute();
 const { documentId, documentTitle, refreshFromServer } = useDocumentId();
-const { open, showLogDock } = useLogDock();
+const { breadcrumbs } = useAppBreadcrumbs();
 
-const activeMenu = computed(() => route.path);
-const pageTitle = computed(() => (route.meta.title as string) || "mycs");
+const activeMenu = computed(() => (route.meta.menu as string) || route.path);
 const isChatRoute = computed(() => route.path === "/chat" || route.path.startsWith("/chat/"));
-
-function onLogButton() {
-  showLogDock();
-}
+const isFullHeightRoute = computed(() => Boolean(route.meta.fullHeight));
+const showHandbookContext = computed(() => route.path === "/chat");
 
 onMounted(() => {
   refreshFromServer();
@@ -137,8 +136,15 @@ onMounted(() => {
   height: 56px;
   padding: 0 20px;
 }
-.page-title {
-  font-size: 16px;
+.app-breadcrumb {
+  font-size: 14px;
+  line-height: 1;
+}
+.app-breadcrumb :deep(.el-breadcrumb__inner) {
+  font-weight: 500;
+  color: #606266;
+}
+.app-breadcrumb :deep(.el-breadcrumb__item:last-child .el-breadcrumb__inner) {
   font-weight: 600;
   color: #303133;
 }
@@ -171,6 +177,19 @@ onMounted(() => {
 .admin-main--chat > :deep(*) {
   flex: 1;
   min-height: 0;
+}
+.admin-main--fill {
+  overflow: hidden;
+  height: calc(100vh - 56px);
+  min-height: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+.admin-main--fill > :deep(*) {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 </style>
 

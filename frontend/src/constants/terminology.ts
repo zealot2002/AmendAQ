@@ -18,7 +18,8 @@ export const T = {
   knowledgeGraph: "结构化知识点",
 
   stepUpload: "上传手册",
-  stepUploadDesc: "支持 .txt 文本",
+  stepUploadDesc: "支持 .txt / .md",
+  uploadFileLabel: "选择制度文本或 FAQ（.txt / .md）",
   stepParse: "自动整理目录",
   stepParseDesc: "生成目录草稿与知识点",
   stepReview: "检查与修改",
@@ -31,21 +32,58 @@ export const T = {
   colPendingSections: "待发布章节数",
   colLiveEntries: "已上线条目数",
 
-  navWorkflow: "搭建知识库",
-  navReview: "审核目录",
-  navChat: "智能问答",
-  navLibrary: "已入库手册",
+  navLibraryMgmt: "知识库",
+  navLibraryNew: "新建",
+  navLibraryIngest: "整理入库",
+  navLibraryEdit: "编辑目录",
+  navLibraryReview: "审核",
+  navChat: "问答",
+  navLogs: "日志",
 
-  btnUploadSave: "保存上传",
+  btnAddLibrary: "新建知识库",
+  btnEdit: "编辑",
+  btnReview: "审核",
+  reviewAnswerLabel: "答案",
+  reviewSummaryLabel: "章说明（可选）",
+  reviewChapterNoAnswer: "章节点无单独答案，请点选左侧具体问题。",
+  btnContinueIngest: "整理目录",
+  colLibraryName: "名称",
+  colStatus: "状态",
+  colActions: "操作",
+  statusPendingIngest: "待整理",
+  statusDraft: "待发布",
+  statusLive: "已上线",
+  organizePromptTitle: "豆包整理 Prompt（复制到外部大模型）",
+  organizePromptCopy: "复制 Prompt",
+  organizePromptCopied: "已复制到剪贴板",
+  handbookOrganizeNote:
+    "员工手册：请让大模型输出 .txt，章用「1. 标题」、节用「1.1 标题」+ 正文，不要用 FAQ 格式。",
+  ingestHint:
+    "入库只做格式校验与解析（不调大模型）。请先用下方 Prompt 在外部整理好再上传。",
+  docFormatHint:
+    "规范：FAQ 用 .md（## 业务域、### Qn. 标题、**答：**）；员工手册用 .txt（1. 章、1.1 节 + 正文）。不符合则入库失败。",
+  ingestProgressTitle: "正在整理目录",
+  ingestOpenLogs: "查看运行日志（实时）",
+
+  btnUploadSave: "仅上传",
+  btnUploadAndIngest: "上传并整理目录",
   btnParse: "整理目录",
+  tipNewStep1: "选好符合规范的 .md 或 .txt 后，点「上传并整理目录」即可。",
+  tipNewStep2: "文件已保存。点「整理目录」按规范自动分章节。",
   btnPublish: "正式发布",
   msgUploadOk: "上传成功",
   msgDraftReady: "目录草稿已生成，请先检查再发布",
-  msgPublished: "已正式发布，可以去「智能问答」试试",
+  msgPublished: "已正式发布，可以去「问答」试试",
 
   tipTitle: "怎么用？",
   tipBody:
-    "1. 上传一本手册（txt）→ 2. 点「整理目录」自动分章节 → 3. 检查标题有无问题 → 4. 点「正式发布」。只有发布后，问答才会用到这份内容。",
+    "杂乱 Word/表格请用外部大模型先整理成规范 .md 或 .txt（见项目 docs/入库格式与外部整理.md），再上传。入库不符合规范会直接失败，以保证 Wiki 质量。",
+  tipEditTitle: "编辑已有知识库",
+  tipEditBody:
+    "此页仅修改目录中的标题与摘要，不能重新上传源文件。需要换稿请新建知识库。改完后如有未发布草稿，可点「正式发布」。",
+  panelActionsCreate: "上传并入库",
+  panelActionsEdit: "发布",
+  editNoReingest: "已入库知识库不支持再次整理目录，以免覆盖手工修改。",
 
   entryCode: "条目编号",
   entryCodeHint: "系统内部编号，一般不用改；点表格某一行可编辑标题",
@@ -53,9 +91,10 @@ export const T = {
   chatEmpty: "请先完成上传并「正式发布」，再在这里提问",
   chatTraceTitle: "回答过程（实时）",
 
-  libraryEmpty: "还没有入库的手册，请先在「搭建知识库」上传",
+  libraryEmpty: "还没有知识库，点击「新增知识库」开始",
 
   logEmpty: "暂无运行记录，操作手册或提问后会出现",
+  logPageHint: "全屏日志页；任意界面也可点右下角悬浮球侧栏查看。",
 
   auditTitle: "如何检查、审核？",
   auditSteps: [
@@ -64,7 +103,8 @@ export const T = {
     "不必每一条都改；整体看过没问题即可",
     "最后点右上角「正式发布」，员工才能在问答里用到",
   ],
-  auditTreeLink: "用树形目录审核（更适合章节多的手册）",
+  auditTreeLink: "切换到树形审核页",
+  backToLibraryList: "返回知识库列表",
   catalogEmptyNeedParse: "还没有目录：请先点「整理目录」",
   catalogEmptyMismatch: "目录加载异常，请点「刷新」；仍为空请联系管理员",
 } as const;

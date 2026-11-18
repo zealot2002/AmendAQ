@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import os
 from typing import Any
 
+from mycs.llm.factory import resolve_llm_model_name
 from mycs.ui.trace_kinds import resolve_step_kind
 
 _INTENT_ZH = {
@@ -42,20 +42,23 @@ def enrich_display(step: str, payload: dict[str, Any], *, question: str) -> dict
 
 
 def _llm_label(p: dict[str, Any] | None = None) -> str:
-    """Show actual model name in UI (avoid hardcoded GLM)."""
+    """Show active backend model (智谱 GLM when MYCS_LLM=glm)."""
     if isinstance(p, dict):
         calls = p.get("llm_calls")
         if isinstance(calls, list):
+            backend = resolve_llm_model_name()
             for call in calls:
-                if isinstance(call, dict):
-                    model = str(call.get("model") or "").strip()
-                    if model:
-                        return model
-    for key in ("OPENAI_MODEL", "GLM_MODEL", "GROQ_MODEL"):
-        model = (os.environ.get(key) or "").strip()
-        if model:
-            return model
-    return "大模型"
+                if not isinstance(call, dict):
+                    continue
+                model = str(call.get("model") or "").strip()
+                if not model:
+                    continue
+                if model.lower().startswith("qwen") and "智谱" in backend:
+                    return backend
+                if "glm" in model.lower() or "智谱" in backend:
+                    return resolve_llm_model_name("glm")
+                return model
+    return resolve_llm_model_name()
 
 
 def _narrate(step: str, p: dict[str, Any], *, question: str) -> dict[str, str]:

@@ -26,6 +26,7 @@ from mycs.paths import runtime_paths
 from mycs.ui import wiki_admin
 from mycs.ui.active_document import resolve_active_document_id, set_active_document_id
 from mycs.knowledge.service import ensure_database
+from mycs.ui.ingest_document import run_ingest_uploaded
 from mycs.ui.workflow import (
     ingest_uploaded,
     save_upload_bytes,
@@ -41,14 +42,23 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 def _require_document_id(explicit: str = "") -> str:
     doc = (explicit or "").strip() or resolve_active_document_id()
     if not doc:
-        raise HTTPException(400, "尚无文档，请先上传 .txt（document_id 将自动生成）")
+        raise HTTPException(400, "尚无文档，请先上传 .txt / .md（document_id 将自动生成）")
     return doc
 
 
 def create_app() -> FastAPI:
+    from mycs.env_loader import load_project_dotenv
+    from mycs.llm.factory import resolve_llm_backend, resolve_llm_model_name
+
+    load_project_dotenv(override=True)
     buf = install_log_buffer_handler()
     paths = runtime_paths()
     logger.info("API create_app db=%s uploads=%s traces=%s kg=%s", paths["db"], paths["uploads"], paths["traces"], paths["kg"])
+    logger.info(
+        "joyjoy: llm backend=%s display=%s",
+        resolve_llm_backend(),
+        resolve_llm_model_name(),
+    )
     logger.info("log buffer capacity=%s", os.environ.get("MYCS_LOG_BUFFER_SIZE", "2000"))
 
     app = FastAPI(title="mycs API", version="0.1.0")
@@ -95,11 +105,15 @@ def create_app() -> FastAPI:
                 title = svc.document_display_title(document_id=doc)
             finally:
                 svc.close()
+        from mycs.llm.factory import resolve_llm_backend, resolve_llm_model_name
+
         return {
             "document_id": doc,
             "document_title": title,
             "paths": paths,
             "log_buffer_size": buf._maxlen,
+            "llm_backend": resolve_llm_backend(),
+            "llm_model": resolve_llm_model_name(),
         }
 
     @app.get("/api/mounts")
@@ -128,12 +142,59 @@ def create_app() -> FastAPI:
         explicit = (body.document_id if body else "") or ""
         doc = _require_document_id(explicit)
         logger.info("ingest document_id=%s", doc)
-        ingest_uploaded(doc)
-        return {
-            "document_id": doc,
-            "workflow": workflow_state(doc),
-            "toc": wiki_admin.get_toc(doc),
-        }
+        try:
+            payload = run_ingest_uploaded(doc)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        return payload
+
+    @app.post("/api/ingest/stream")
+    def ingest_stream(body: DocumentBody | None = None) -> StreamingResponse:
+        explicit = (body.document_id if body else "") or ""
+        doc = _require_document_id(explicit)
+        logger.info("ingest stream start document_id=%s", doc)
+
+        event_q: queue.Queue[tuple[str, Any]] = queue.Queue()
+
+        def on_progress(stage: str, percent: int, message: str) -> None:
+            event_q.put(("progress", {"stage": stage, "percent": percent, "message": message}))
+
+        def worker() -> None:
+            try:
+                result = run_ingest_uploaded(doc, on_progress=on_progress)
+                event_q.put(("done", result))
+            except ValueError as exc:
+                event_q.put(("error", str(exc)))
+            except Exception as exc:
+                logger.exception("ingest stream failed")
+                event_q.put(("error", str(exc)))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+        def generate():
+            while True:
+                kind, data = event_q.get()
+                if kind == "progress":
+                    line = json.dumps({"type": "progress", "payload": data}, ensure_ascii=False)
+                    yield f"data: {line}\n\n"
+                elif kind == "done":
+                    line = json.dumps({"type": "done", "result": data}, ensure_ascii=False)
+                    yield f"data: {line}\n\n"
+                    break
+                elif kind == "error":
+                    line = json.dumps({"type": "error", "message": data}, ensure_ascii=False)
+                    yield f"data: {line}\n\n"
+                    break
+
+        return StreamingResponse(
+            generate(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
 
     @app.post("/api/ingest/path")
     def ingest_path(body: IngestPathBody) -> dict[str, Any]:
@@ -147,7 +208,10 @@ def create_app() -> FastAPI:
         finally:
             conn.close()
         logger.info("ingest/path document_id=%s path=%s", doc, path)
-        wiki_admin.ingest_and_draft(str(path), doc)
+        try:
+            wiki_admin.ingest_and_draft(str(path), doc)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
         set_active_document_id(doc)
         return {
             "document_id": doc,
@@ -185,6 +249,7 @@ def create_app() -> FastAPI:
             node_id,
             body.title or "",
             body.summary or "",
+            body.body,
         )
 
     @app.post("/api/chat")
@@ -349,6 +414,7 @@ class IngestPathBody(BaseModel):
 class NodePatchBody(BaseModel):
     title: str | None = None
     summary: str | None = None
+    body: str | None = None
 
 
 class ChatBody(BaseModel):

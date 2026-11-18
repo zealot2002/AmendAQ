@@ -443,6 +443,7 @@ class KnowledgeService:
         *,
         title: str | None = None,
         summary: str | None = None,
+        body: str | None = None,
         parent_id: str | None = None,
         disabled: bool | None = None,
     ) -> dict[str, Any]:
@@ -455,16 +456,21 @@ class KnowledgeService:
 
         ts = datetime.now(timezone.utc).isoformat()
         new_title = title if title is not None else row["title"]
-        new_summary = summary if summary is not None else row["summary"]
+        new_body = body if body is not None else row["body"]
+        if row["kind"] == "leaf" and body is not None:
+            text = (new_body or "").strip()
+            new_summary = text[:280] + ("…" if len(text) > 280 else "")
+        else:
+            new_summary = summary if summary is not None else row["summary"]
         new_parent = parent_id if parent_id is not None else row["parent_id"]
         new_dis = int(disabled) if disabled is not None else row["disabled"]
         self._conn.execute(
             """
-            UPDATE wiki_toc_node SET title = ?, summary = ?, parent_id = ?,
+            UPDATE wiki_toc_node SET title = ?, summary = ?, body = ?, parent_id = ?,
               disabled = ?, updated_at = ?
             WHERE node_id = ?
             """,
-            (new_title, new_summary, new_parent, new_dis, ts, node_id),
+            (new_title, new_summary, new_body, new_parent, new_dis, ts, node_id),
         )
         self._conn.commit()
         return {"node_id": node_id, "updated": True}

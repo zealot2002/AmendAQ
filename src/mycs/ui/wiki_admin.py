@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from mycs.graph.extract import ingest_txt_file
+from mycs.ui.ingest_document import ingest_document_file
 from mycs.knowledge.service import KnowledgeService, ensure_database
 from mycs.log import get_logger
 
@@ -69,7 +69,7 @@ def ingest_and_draft(file_path: str, doc_id: str) -> str:
     ensure_database()
     document_id = doc_id or path.stem
     logger.info("wiki ingest_and_draft path=%s document_id=%s", path, document_id)
-    ingest_txt_file(path, document_id=document_id)
+    ingest_document_file(path, document_id=document_id)
     from mycs.ui.terminology import WIKI_DRAFT, WIKI_PUBLISHED
 
     return _outline_md(doc_id or path.stem, f"{WIKI_DRAFT}已生成（尚未{WIKI_PUBLISHED}）")
@@ -99,13 +99,23 @@ def publish_doc(document_id: str) -> str:
     return _outline_md(document_id, f"{WIKI}已{WIKI_PUBLISHED} nodes={result.get('published_nodes')}")
 
 
-def save_node_edit(node_id: str, title: str, summary: str) -> dict[str, Any]:
+def save_node_edit(
+    node_id: str,
+    title: str,
+    summary: str,
+    body: str | None = None,
+) -> dict[str, Any]:
     if not node_id.strip():
         return {"ok": False, "message": "请填写 node_id"}
     ensure_database()
     svc = KnowledgeService()
     try:
-        svc.wiki_update_node(node_id.strip(), title=title or None, summary=summary or None)
+        svc.wiki_update_node(
+            node_id.strip(),
+            title=title or None,
+            summary=summary or None,
+            body=body,
+        )
         return {"ok": True, "node_id": node_id.strip()}
     finally:
         svc.close()

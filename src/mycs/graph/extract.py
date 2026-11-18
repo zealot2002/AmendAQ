@@ -149,6 +149,70 @@ class SectionGraphBuilder:
         return graph
 
 
+def knowledge_graph_from_outline_roots(
+    roots: list,
+    *,
+    document_id: str,
+    title: str,
+    source_uri: str,
+    leaf_quotes: dict[str, str] | None = None,
+) -> KnowledgeGraph:
+    """Build Policy entities + evidence from compiled outline (FAQ / canonical ingest)."""
+    from mycs.wiki.outline import OutlineNode
+
+    quotes = leaf_quotes or {}
+    entities: list[GraphEntity] = []
+    evidence: list[GraphEvidence] = []
+    for ch in roots:
+        if not isinstance(ch, OutlineNode):
+            continue
+        for leaf in ch.children:
+            if leaf.kind != "leaf":
+                continue
+            sec = leaf.section_ref
+            pid = f"{document_id}_{sec.replace('.', '_')}"
+            body = leaf.body
+            entities.append(
+                GraphEntity(
+                    entity_id=pid,
+                    entity_type="Policy",
+                    name=leaf.title,
+                    summary=leaf.summary or leaf.title,
+                    tags=[],
+                    properties={
+                        "section": sec,
+                        "body": body,
+                        "policy_id": pid,
+                    },
+                )
+            )
+            quote = quotes.get(sec) or (body[:500] if body else "")
+            evidence.append(
+                GraphEvidence(
+                    evidence_id=f"ev_{pid}",
+                    entity_id=pid,
+                    quote=quote,
+                    section_ref=sec,
+                )
+            )
+    graph = KnowledgeGraph(
+        document_id=document_id,
+        title=title,
+        source_uri=source_uri,
+        entities=entities,
+        relations=[],
+        evidence=evidence,
+    )
+    log_step(
+        logger,
+        "ingest_outline_graph_done",
+        document_id=document_id,
+        entities=len(graph.entities),
+        evidence=len(graph.evidence),
+    )
+    return graph
+
+
 class OllamaGraphExtractor:
     """LLM-driven extraction (full document or chunked)."""
 
