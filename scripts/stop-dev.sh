@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 API_PORT="${MYCS_API_PORT:-8765}"
-WEB_PORT="${MYCS_WEB_PORT:-5173}"
+WEB_PORT="${MYCS_WEB_PORT:-5180}"
 LOG_DIR="${MYCS_DEV_LOG_DIR:-$ROOT/data/dev-logs}"
 
 kill_pid_file() {

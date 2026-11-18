@@ -6,7 +6,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 API_PORT="${MYCS_API_PORT:-8765}"
-WEB_PORT="${MYCS_WEB_PORT:-5173}"
+WEB_PORT="${MYCS_WEB_PORT:-5180}"
 LOG_DIR="${MYCS_DEV_LOG_DIR:-$ROOT/data/dev-logs}"
 PID_API="$LOG_DIR/api.pid"
 PID_WEB="$LOG_DIR/frontend.pid"
