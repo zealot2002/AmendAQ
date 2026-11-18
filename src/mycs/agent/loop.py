@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,7 @@ from mycs.planning.chapter_hints import (
 )
 from mycs.planning.drill_scope import clear_drill_scope, should_release_drill_scope
 from mycs.skills.loader import evidence_text, load_skills, match_skills
+from mycs.planning.search_grounding import supplement_requirements_after_search
 from mycs.planning.sibling_expand import (
     ensure_by_section_requirements,
     ensure_scoped_section_requirements,
@@ -77,6 +79,7 @@ class AgentLoop:
         *,
         on_event: OnTraceEvent = None,
     ) -> AgentRunResult:
+        run_started = time.perf_counter()
         trace: list[TraceEvent] = []
         begin_llm_capture()
 
@@ -527,6 +530,19 @@ class AgentLoop:
                 if retried_unscoped:
                     tool_payload["retried_unscoped"] = True
                 emit("tool", tool_payload)
+            if understood.intent == "graph_qa" and any(
+                r.field == "graph.entity.search" and r.satisfied for r in requirements
+            ):
+                requirements, grounded = supplement_requirements_after_search(
+                    requirements,
+                    context,
+                    document_id=understood.graph_document_id,
+                )
+                if grounded:
+                    logger.info(
+                        "joyjoy: search grounding supplemented by_section (+%s)",
+                        grounded,
+                    )
 
         progress("正在根据检索结果撰写回答…")
         clauses = evidence_text(context)
@@ -587,6 +603,8 @@ class AgentLoop:
             if revised.strip():
                 answer = revised.strip()
         progress("正在核对回答是否有据…")
+        from mycs.answer_format import answer_for_user, expose_answer_evidence, split_answer_sections
+
         verify = self._run_verify(understood, context, claims, answer=answer)
         emit(
             "verify",
@@ -601,10 +619,17 @@ class AgentLoop:
                 },
             },
         )
+        _, evidence = split_answer_sections(answer)
+        user_answer = answer_for_user(answer)
+        if evidence:
+            logger.info(
+                "joyjoy: answer_evidence (not shown to user unless MYCS_CHAT_SHOW_EVIDENCE=1)\n%s",
+                evidence,
+            )
         emit(
             "answer",
             {
-                "text": answer,
+                "text": user_answer,
                 "claims": claims,
                 "compose_context_keys": sorted(context.keys()),
                 "wiki_leaves": context.get("wiki_leaves"),
@@ -612,19 +637,24 @@ class AgentLoop:
                 "llm_calls": compose_llm_calls,
             },
         )
+        elapsed = round(time.perf_counter() - run_started, 1)
         log_step(
             logger,
             "agent_run_done",
             verify_ok=verify.ok,
-            answer_preview=answer[:200],
+            answer_preview=user_answer[:200],
+            answer_full_len=len(answer),
+            has_evidence=bool(evidence),
+            elapsed_seconds=elapsed,
         )
 
         return AgentRunResult(
             question=question,
             case_id=understood.case_id,
-            answer=answer,
+            answer=user_answer,
             trace=trace,
             verify=verify,
+            elapsed_seconds=elapsed,
         )
 
     def _run_verify(

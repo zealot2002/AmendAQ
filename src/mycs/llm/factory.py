@@ -9,7 +9,7 @@ from mycs.log import get_logger
 logger = get_logger(__name__)
 
 GLM_DEFAULT_BASE = "https://open.bigmodel.cn/api/paas/v4"
-GLM_DEFAULT_MODEL = "glm-4-flash"
+GLM_DEFAULT_MODEL = "glm-4-flash-250414"
 ZHIPU_DISPLAY = "智谱 GLM"
 GROQ_DEFAULT_BASE = "https://api.groq.com/openai/v1"
 # Groq Console 免费档常见 ID（2026-10）；更强可设 openai/gpt-oss-120b

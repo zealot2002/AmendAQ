@@ -136,8 +136,11 @@ def validate_canonical(
     if not draft.leaves:
         errors.append("leaves: empty")
 
-    ch_refs = {c.section_ref for c in draft.chapters}
-    if len(ch_refs) != len(draft.chapters):
+    ch_refs: set[str] = set()
+    for c in draft.chapters:
+        ch_refs.add(c.section_ref)
+        ch_refs.add(c.section_ref.rstrip("."))
+    if len({c.section_ref for c in draft.chapters}) != len(draft.chapters):
         errors.append("chapters: duplicate section_ref")
 
     leaf_refs: set[str] = set()

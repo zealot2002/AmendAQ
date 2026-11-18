@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -50,6 +51,39 @@ def _cmd_reset_data(argv: list[str]) -> int:
     print(f"joyjoy: db at {stats['db']}")
     print("joyjoy: next: export MYCS_GRAPH_DOCUMENT=your_doc && uv run mycs ingest txt ... --publish")
     return 0
+
+
+def _cmd_wiki_audit(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="mycs wiki audit")
+    parser.add_argument("--doc-id", dest="doc_id", required=True)
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="Write JSON report (default: data/audit/<doc_id>_rigor.json)",
+    )
+    parser.add_argument(
+        "--no-llm",
+        action="store_true",
+        help="Skip LLM pass (deterministic checks only)",
+    )
+    args = parser.parse_args(argv)
+    ensure_database()
+    from mycs.db.connection import connect, get_db_path
+    from mycs.wiki.rigor_audit import audit_wiki_document, write_audit_json
+
+    conn = connect(get_db_path())
+    try:
+        llm = None if args.no_llm else create_llm()
+        report = audit_wiki_document(conn, args.doc_id, llm=llm)
+    finally:
+        conn.close()
+    out = args.out or Path("data/audit") / f"{args.doc_id}_rigor.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    write_audit_json(report, out)
+    print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
+    print(f"joyjoy: wrote {out}")
+    return 0 if report.ok else 2
 
 
 def _cmd_wiki_publish(argv: list[str]) -> int:
@@ -185,6 +219,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_ingest_compile(argv[2:])
     if len(argv) >= 2 and argv[0] == "wiki" and argv[1] == "publish":
         return _cmd_wiki_publish(argv[2:])
+    if len(argv) >= 2 and argv[0] == "wiki" and argv[1] == "audit":
+        return _cmd_wiki_audit(argv[2:])
 
     parser = argparse.ArgumentParser(description="mycs Knowledge Agent (Ollama)")
     parser.add_argument("question", nargs="?", help="User question")
@@ -231,6 +267,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print(result.answer)
     print()
+    print(f"[耗时 {result.elapsed_seconds:.1f}s]")
     print(f"[verify ok={result.verify.ok}] {result.verify.message}")
 
     if not args.no_save_trace:

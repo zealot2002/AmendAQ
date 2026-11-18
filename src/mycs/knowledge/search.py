@@ -4,10 +4,24 @@ import re
 from typing import Any
 
 
+def _chinese_bigrams(segment: str) -> set[str]:
+    """Overlapping 2-char units so「走势图…」与「走势图能投屏…」能匹配。"""
+    seg = segment.strip()
+    if len(seg) < 2:
+        return set()
+    if len(seg) <= 6:
+        return {seg}
+    out: set[str] = set()
+    for i in range(len(seg) - 1):
+        out.add(seg[i : i + 2])
+    return out
+
+
 def tokenize(text: str) -> set[str]:
     text = text.lower()
     tokens: set[str] = set()
-    tokens.update(re.findall(r"[\u4e00-\u9fff]{2,}", text))
+    for seg in re.findall(r"[\u4e00-\u9fff]+", text):
+        tokens.update(_chinese_bigrams(seg))
     tokens.update(re.findall(r"[a-z0-9]{2,}", text))
     for m in re.finditer(r"\d+[,\d]*", text):
         tokens.add(m.group().replace(",", ""))

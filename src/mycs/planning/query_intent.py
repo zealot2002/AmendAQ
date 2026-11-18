@@ -23,10 +23,15 @@ def is_whole_document_query(question: str) -> bool:
 
 def search_keywords_for(question: str) -> str:
     """Shorter query for lexical search (long prompts score poorly)."""
+    from mycs.knowledge.search import tokenize
+
     q = question.strip()
     if _AMOUNT.search(q):
         return "金额 上限 限额 元 报销 补贴 奖金"
-    tokens = re.findall(r"[\u4e00-\u9fff]{2,}", q)
-    if len(tokens) > 6:
-        return " ".join(tokens[:6])
+    toks = sorted(tokenize(q), key=len, reverse=True)
+    if len(toks) > 8:
+        return " ".join(toks[:8])
+    if len(q) > 40:
+        segs = re.findall(r"[\u4e00-\u9fff]{2,8}", q)
+        return " ".join(segs[:6]) if segs else q
     return q

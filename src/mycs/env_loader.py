@@ -16,7 +16,7 @@ def load_project_dotenv(*, override: bool = True) -> bool:
         key = os.environ.get("GLM_API_KEY") or os.environ.get("ZHIPUAI_API_KEY")
         if key and (os.environ.get("MYCS_LLM") or "").strip().lower() in ("", "openai", "vllm", "compat"):
             os.environ["MYCS_LLM"] = "glm"
-            os.environ.setdefault("GLM_MODEL", "glm-4-flash")
+            os.environ.setdefault("GLM_MODEL", "glm-4-flash-250414")
             logger.info("joyjoy: no .env; GLM key in env → MYCS_LLM=glm")
         return False
     loaded = 0

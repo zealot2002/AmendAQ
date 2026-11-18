@@ -52,8 +52,11 @@ class GapResolver:
                     "section_refs": section_refs,
                 }
             if field == "graph.entity.by_section":
+                section = params.get("section") or params.get("section_ref")
+                if not section:
+                    raise RuntimeError("graph.entity.by_section needs section or section_ref")
                 return "kg_get_entity_by_section", {
-                    "section": params["section"],
+                    "section": section,
                     "document_id": params.get("document_id")
                     or context.get("graph_document_id"),
                 }

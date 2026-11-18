@@ -61,6 +61,7 @@ class AgentRunResult:
     answer: str
     trace: list[TraceEvent]
     verify: VerifyResult
+    elapsed_seconds: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -69,4 +70,5 @@ class AgentRunResult:
             "answer": self.answer,
             "verify": asdict(self.verify),
             "trace": [e.to_dict() for e in self.trace],
+            "elapsed_seconds": round(self.elapsed_seconds, 1),
         }

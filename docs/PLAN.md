@@ -17,6 +17,8 @@
 
 **明确不做：** 独立「simple chunk / 向量 RAG」里程碑。未入库原文通过 ingest 写入 Wiki 时附带证据引用，Verify 只做确定性比对，不做语义片段检索。
 
+实体召回与节号钉死（`kg_search_entities` 加权打分、search grounding）见 **[本地检索与寻址.md](./本地检索与寻址.md)**。
+
 ### 领域适配（同一套 Agent，不同后台）
 
 | 场景 | Wiki 示例 | 动态 API 示例（可选） |

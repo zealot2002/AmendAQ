@@ -133,11 +133,14 @@ class Verifier:
         for sec in section_sources:
             if sec.replace(".", "") in norm or f"§{sec}" in answer or sec in answer:
                 cited_sections += 1
+        # 放宽：已检索到叶子时，不强制正文含 §（FAQ 列表式「依据」常见）
+        cite_ok = cited_sections >= 1 or has_knowledge
         checks.append(
             {
                 "name": "answer_cites_section",
-                "ok": cited_sections >= 1,
+                "ok": cite_ok,
                 "cited": cited_sections,
+                "relaxed": cited_sections < 1 and has_knowledge,
             }
         )
 

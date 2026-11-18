@@ -235,6 +235,28 @@ def create_app() -> FastAPI:
             "toc": wiki_admin.get_toc(doc),
         }
 
+    @app.post("/api/wiki/audit")
+    def wiki_audit(body: DocumentBody | None = None) -> dict[str, Any]:
+        explicit = (body.document_id if body else "") or ""
+        doc = _require_document_id(explicit)
+        from mycs.db.connection import connect, get_db_path
+        from mycs.wiki.rigor_audit import audit_wiki_document
+
+        ensure_database()
+        conn = connect(get_db_path())
+        try:
+            report = audit_wiki_document(conn, doc, llm=create_llm())
+        finally:
+            conn.close()
+        payload = report.to_dict()
+        if not report.ok:
+            logger.info(
+                "joyjoy: wiki audit failed doc=%s blocks=%s",
+                doc,
+                payload.get("block_count"),
+            )
+        return payload
+
     @app.get("/api/toc/{document_id}")
     def toc(document_id: str) -> dict[str, Any]:
         doc = document_id.strip() or resolve_active_document_id()

@@ -102,7 +102,7 @@ def ensure_by_section_requirements(
     if len(refs) < min_refs:
         return requirements, 0
     have = {
-        str(r.params.get("section") or "")
+        str(r.params.get("section") or r.params.get("section_ref") or "")
         for r in requirements
         if r.field == "graph.entity.by_section"
     }

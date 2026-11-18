@@ -13,6 +13,12 @@
                   {{ m.content || "正在思考…" }}
                 </div>
                 <div v-else class="text">{{ m.content }}</div>
+                <div
+                  v-if="m.role === 'assistant' && !m.pending && m.elapsedSeconds != null"
+                  class="msg-meta"
+                >
+                  耗时 {{ formatElapsed(m.elapsedSeconds) }} s
+                </div>
               </div>
             </div>
             <el-empty v-if="!messages.length" :description="T.chatEmpty" />
@@ -135,7 +141,13 @@ import { useDocumentId } from "@/composables/useDocumentId";
 const { documentId } = useDocumentId();
 const question = ref("");
 const loading = ref(false);
-const messages = ref<{ role: "user" | "assistant"; content: string; pending?: boolean }[]>([]);
+const messages = ref<
+  { role: "user" | "assistant"; content: string; pending?: boolean; elapsedSeconds?: number }[]
+>([]);
+
+function formatElapsed(v: number) {
+  return Number.isInteger(v) ? String(v) : v.toFixed(1);
+}
 const trace = ref<ChatTraceEvent[]>([]);
 const verifyOk = ref<boolean | null>(null);
 const runningLabel = ref("");
@@ -310,6 +322,7 @@ async function send() {
     messages.value.push({ role: "assistant", content: "", pending: true }) - 1;
   await scrollMessages();
 
+  const startedAt = performance.now();
   try {
     const res = await chatStream(
       q,
@@ -323,7 +336,13 @@ async function send() {
         },
       },
     );
-    messages.value[assistantIdx] = { role: "assistant", content: res.answer };
+    const elapsedSeconds =
+      res.elapsed_seconds ?? Math.round((performance.now() - startedAt) / 100) / 10;
+    messages.value[assistantIdx] = {
+      role: "assistant",
+      content: res.answer,
+      elapsedSeconds,
+    };
     verifyOk.value = res.verify?.ok ?? null;
   } catch (e: unknown) {
     ElMessage.error(String(e));
@@ -423,6 +442,14 @@ async function send() {
   white-space: pre-wrap;
   line-height: 1.5;
   font-size: 14px;
+}
+.msg-meta {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid #ebeef5;
+  font-size: 12px;
+  color: #909399;
+  text-align: right;
 }
 .text.pending {
   display: flex;

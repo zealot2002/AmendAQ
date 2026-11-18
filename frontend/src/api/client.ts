@@ -221,6 +221,7 @@ export type ChatResult = {
   trace: ChatTraceEvent[];
   trace_path?: string;
   document_id?: string;
+  elapsed_seconds?: number;
 };
 
 export async function chat(message: string, documentId?: string, caseId?: string) {

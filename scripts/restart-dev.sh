@@ -75,7 +75,7 @@ load_project_env() {
   else
     if [[ -n "${GLM_API_KEY:-}${ZHIPUAI_API_KEY:-}" ]]; then
       export MYCS_LLM=glm
-      export GLM_MODEL="${GLM_MODEL:-glm-4-flash}"
+      export GLM_MODEL="${GLM_MODEL:-glm-4-flash-250414}"
       log "未发现 .env，但 shell 中有智谱 Key → 强制 MYCS_LLM=glm GLM_MODEL=$GLM_MODEL"
     else
       log "未发现 $ROOT/.env，可 cp .env.example .env 并填写 GLM_API_KEY"
