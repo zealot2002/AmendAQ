@@ -1,9 +1,23 @@
 from mycs.planning.chapter_hints import (
     drill_matches_seeded_chapters,
     is_composite_handbook_query,
+    merged_chapter_seeds,
     seed_chapter_refs_from_question,
     seed_leaf_sections_from_question,
 )
+
+
+def test_merged_chapter_seeds_ai_and_shopkeeper():
+    chapters = [
+        {"section_ref": "7.", "title": "店主申请"},
+        {"section_ref": "9.", "title": "数据分析"},
+        {"section_ref": "10.", "title": "支付与其他"},
+    ]
+    q = "AI推荐可靠吗？\n如何申请成为店主？"
+    refs = merged_chapter_seeds(q, chapters)
+    assert "7." in refs
+    assert "9." in refs
+    assert "10." not in refs
 
 
 def test_composite_offboarding_question():

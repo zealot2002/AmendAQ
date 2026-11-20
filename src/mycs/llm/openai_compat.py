@@ -95,6 +95,30 @@ class OpenAICompatLLM:
         )
         return out
 
+    def split_questions(self, question: str) -> dict[str, Any]:
+        system = (
+            "你是客服对话的「题目拆分」模块，与后续的检索、作答流程无关。"
+            "任务：判断用户是否在一次输入里问了**多道彼此独立**的小问题。"
+            "只输出 JSON，不要 markdown。格式："
+            '{"questions":["...",...],"reason":"..."}。'
+            "\n规则："
+            "\n1. 若本质是一道题（哪怕很长、含多个要点但仍围绕同一主题），questions 只含 1 条，"
+            "内容为用户原意的一句完整问句，不要拆碎。"
+            "\n2. 若明显是多道题（如换行、两个问号、「还有/另外」引出第二问），"
+            "questions 为 2–5 条，每条可独立检索 FAQ，保留用户用词。"
+            "\n3. 不要编造用户没问的内容；不要加编号前缀。"
+        )
+        user = json.dumps({"user_input": question}, ensure_ascii=False)
+        try:
+            data = self._json_chat(system, user, max_tokens=512)
+            return {
+                "questions": data.get("questions") or data.get("sub_questions") or [],
+                "reason": str(data.get("reason") or ""),
+            }
+        except Exception as exc:
+            logger.error("llm split_questions failed: %s", exc)
+            raise LLMError(f"split_questions failed: {exc}") from exc
+
     def select_toc_branch(
         self,
         *,
@@ -156,6 +180,7 @@ class OpenAICompatLLM:
         already_selected: list[dict[str, str]],
         batches_remaining: int,
         composite_query: bool = False,
+        enumerative_query: bool = False,
     ) -> dict[str, Any]:
         composite_note = ""
         if composite_query:
@@ -163,7 +188,16 @@ class OpenAICompatLLM:
                 "\n\n【综合/多事项问题】用户可能在问多个彼此独立的事项（如离职+年假+报销+归还电脑）。"
                 "每一事项可能落在**不同章**；本批命中的章不能代表已覆盖全部。"
                 "必须在本批选出所有可能相关的章；"
+                "section_ref **只能**来自本批 chapters 列表，不得写已选过的其他章号。"
                 f"在 batches_remaining_after_this>0 时**禁止 action=done**，只能用 pick 或 continue。"
+            )
+        enumerative_note = ""
+        if enumerative_query:
+            enumerative_note = (
+                "\n\n【列举/汇总类问题】用户可能要枚举条目（如「有哪些状态」「全部列出」）。"
+                "须看完**所有批次**后在各批挑出**可能相关的章**；"
+                "可用 need_full_handbook 仅当确需通读全手册且你已理解必须覆盖每一章。"
+                "不得在未看完所有批时因怕漏选而 need_full_handbook。"
             )
         system = (
             "你是知识库目录分批浏览助手。手册一级目录（章）很多，系统会**分批**把章列表发给你。"
@@ -181,6 +215,7 @@ class OpenAICompatLLM:
             "- need_full_handbook：问题需要通读全手册（如「所有」「全部」「列举每一个」），不再分批。"
             "\nsection_ref 必须来自本批 chapters 列表，不得编造。"
             + composite_note
+            + enumerative_note
         )
         user = json.dumps(
             {
@@ -192,6 +227,7 @@ class OpenAICompatLLM:
                 "already_selected_chapters": already_selected,
                 "chapters_in_this_batch": chapters_in_batch,
                 "composite_query": composite_query,
+                "enumerative_query": enumerative_query,
             },
             ensure_ascii=False,
         )
@@ -210,6 +246,151 @@ class OpenAICompatLLM:
             logger.error("llm toc batch review failed batch=%s: %s", batch_index, exc)
             return {"action": "continue", "section_refs": [], "reason": str(exc)}
 
+    def review_toc_children_batch(
+        self,
+        *,
+        question: str,
+        parent_section_ref: str,
+        parent_title: str,
+        batch_index: int,
+        batch_total: int,
+        children_in_batch: list[dict[str, object]],
+        already_selected: list[dict[str, str]],
+        batches_remaining: int,
+        enumerative_query: bool = False,
+        composite_query: bool = False,
+    ) -> dict[str, Any]:
+        enumerative_note = ""
+        if enumerative_query:
+            enumerative_note = (
+                "\n\n【列举类问题】须在每批中勾选**与用户所问主题直接相关**的叶/节；"
+                "可能需多选才能完成列举，但**禁止**把明显无关条目一律勾上以「兜底」。"
+            )
+        composite_note = ""
+        if composite_query:
+            composite_note = (
+                "\n\n【多道独立小问题】用户可能一次问了多个不相关事项。"
+                "只勾选**直接回答其中某一问**的叶，不要因「同一父章」就整批全选。"
+            )
+        system = (
+            "你是知识库目录的全面浏览助手。用户在父章节下有一批并列子条目（可能是节或具体问答叶）。"
+            "系统会**分批**展示；你必须假设：本批不相关不等于其他批不相关。"
+            "在 batches_remaining_after_this > 0 时**禁止** action=done/stop，只能用 pick 或 continue。"
+            "只输出 JSON："
+            '{"action":"pick"|"continue","section_refs":["9.2",...],"reason":"..."}。'
+            "\n- pick：本批中与用户问题可能相关的条目 section_ref（可多选）；"
+            "- continue：本批全不相关，且后续批次仍需查看。"
+            "\n若本批全部不相关，section_refs 可为空并使用 continue；**禁止**因怕漏答而勾选调明显无关的条目。"
+            "\nsection_ref 必须来自 children_in_batch，不得编造。kind=leaf 为具体条款。"
+            + enumerative_note
+            + composite_note
+        )
+        user = json.dumps(
+            {
+                "question": question,
+                "parent_section_ref": parent_section_ref,
+                "parent_title": parent_title,
+                "batch_index": batch_index,
+                "batch_total": batch_total,
+                "batches_remaining_after_this": batches_remaining,
+                "already_selected": already_selected,
+                "children_in_this_batch": children_in_batch,
+                "enumerative_query": enumerative_query,
+                "composite_query": composite_query,
+            },
+            ensure_ascii=False,
+        )
+        try:
+            data = self._json_chat(system, user, max_tokens=768)
+            action = str(data.get("action") or "continue").lower()
+            if action in ("done", "stop") and batches_remaining > 0:
+                action = "continue"
+            refs = data.get("section_refs") or []
+            if not isinstance(refs, list):
+                refs = []
+            return {
+                "action": action,
+                "section_refs": [str(r) for r in refs if r],
+                "reason": str(data.get("reason") or ""),
+            }
+        except Exception as exc:
+            logger.error(
+                "llm toc children batch failed parent=%s batch=%s: %s",
+                parent_section_ref,
+                batch_index,
+                exc,
+            )
+            return {"action": "continue", "section_refs": [], "reason": str(exc)}
+
+    def review_faq_title_batch(
+        self,
+        *,
+        question: str,
+        document_title: str,
+        batch_index: int,
+        batch_total: int,
+        entry_total: int,
+        entries_in_batch: list[dict[str, object]],
+        already_selected: list[dict[str, str]],
+        batches_remaining: int,
+        enumerative_query: bool = False,
+        composite_query: bool = False,
+    ) -> dict[str, Any]:
+        enumerative_note = ""
+        if enumerative_query:
+            enumerative_note = (
+                "\n\n【列举类问题】须在多批中勾选与用户所问主题相关的 FAQ 条目；"
+                "不要勾选明显无关的标题。"
+            )
+        composite_note = ""
+        if composite_query:
+            composite_note = (
+                "\n\n【多道独立小问题】只勾选直接回答其中某一问的条目。"
+            )
+        system = (
+            "你是 FAQ 知识库助手。文档是扁平问答列表（每条有 section_ref、title、summary），"
+            "没有章节目录下钻。系统会分批展示全部问答标题；你须在看完**所有批次**前不要声称已完成。"
+            "在 batches_remaining_after_this > 0 时禁止 action=done/stop，只能用 pick 或 continue。"
+            "只输出 JSON："
+            '{"action":"pick"|"continue","section_refs":["§9.3",...],"reason":"..."}。'
+            "\n- pick：本批标题/摘要与用户问题可能相关的条目（可多选）；"
+            "- continue：本批全不相关，仍需看后续批次。"
+            "\nsection_ref 必须来自 entries_in_batch，不得编造。"
+            + enumerative_note
+            + composite_note
+        )
+        user = json.dumps(
+            {
+                "question": question,
+                "document_title": document_title,
+                "batch_index": batch_index,
+                "batch_total": batch_total,
+                "entry_total": entry_total,
+                "batches_remaining_after_this": batches_remaining,
+                "already_selected": already_selected,
+                "entries_in_this_batch": entries_in_batch,
+                "enumerative_query": enumerative_query,
+                "composite_query": composite_query,
+            },
+            ensure_ascii=False,
+        )
+        try:
+            data = self._json_chat(system, user, max_tokens=768)
+            action = str(data.get("action") or "continue").lower()
+            if action in ("done", "stop") and batches_remaining > 0:
+                action = "continue"
+            refs = data.get("section_refs") or []
+            if not isinstance(refs, list):
+                refs = []
+            return {
+                "action": action,
+                "section_refs": [str(r) for r in refs if r],
+                "reason": str(data.get("reason") or ""),
+            }
+        except Exception as exc:
+            logger.error("llm faq title batch failed batch=%s: %s", batch_index, exc)
+            return {"action": "continue", "section_refs": [], "reason": str(exc)}
+
     def plan(
         self,
         understood: UnderstandResult,
@@ -224,10 +405,10 @@ class OpenAICompatLLM:
             "输入含 wiki_toc_outline（已选相关章下的节/条摘要）、wiki_selected_chapters（章列表）、"
             "wiki_drill_path（逐层定位路径，可能为空）。"
             "outline 中的 section_ref 是唯一合法条号来源。"
-            "1) 若已有 drill 范围，优先 graph.entity.search + by_section，branch 仅作补充；"
-            "2) 否则 wiki.toc.branch：params.node_id 或 section_prefix 限定子树；"
-            "3) graph.entity.search（query 用用户原问；若有 branch 则检索限定在该子树）；"
-            "4) graph.entity.by_section 的 section 必须来自 wiki_toc_outline 的 leaf section_ref；"
+            "禁止使用 graph.entity.search。召回已由目录全面遍历完成。"
+            "1) 仅使用 graph.entity.by_section：section 必须来自 wiki_toc_outline 的 leaf section_ref；"
+            "2) 可选 wiki.toc.leaves：params.node_ids 直接取叶子正文；"
+            "3) graph.entity.by_section 的 section 必须来自 wiki_toc_outline 的 leaf section_ref；"
             "若 wiki_scope_section_refs 含多条，每一条都要单独 by_section，不要只查落下的那一节；"
             "5) wiki.toc.leaves 可指定 node_ids 直接取叶子；"
             "6) graph.read.query 仅用于列举/汇总/金额类。"
@@ -296,7 +477,9 @@ class OpenAICompatLLM:
         system = (
             "你是智能客服。优先根据 tool_results.wiki_leaves 与 graph_entities 作答。"
             "引用章节号（§x.y）。禁止编造检索结果中不存在的数字、时限、金额。"
-            "若 wiki_leaves/graph_entities 为空，只回答「当前知识库未检索到相关条款，请补充或联系管理员」。"
+            "仅当 wiki_leaves 与 graph_entities 均为空时，才整句回答「当前知识库未检索到相关条款，请补充或联系管理员」。"
+            "若已检索到实体：必须分事项作答——有依据的事项写清结论；某一事项在实体中无依据时，"
+            "仅对该事项说明未检索到，**不得**因此拒答其他已有依据的事项。"
             "多章节需综合。只输出中文正文。"
             "\n\n【回答格式 — 必须遵守】"
             "\n1. 「结论：」段 = **用户唯一默认可见的完整答复**（不可只写一句话敷衍）："
@@ -305,7 +488,9 @@ class OpenAICompatLLM:
             "\n2. 空一行后写「依据：」：仅作条款对照，每条带 § 号；可简短，勿把仅写在依据里的细节"
             "当作对客答案（细则必须在结论段已写出）。"
             "\n3. 除上述两段外不要写标题、markdown 或客套话。"
-            "\n4. 若问题涉及多项（如离职+年假+报销），结论段分事项写全；依据段列对应 §。"
+            "\n4. 若 JSON 含 sub_questions，结论段须**逐条**回答每一子问题（可编号对应）；"
+            "不得只答第一条。"
+            "\n5. 若问题涉及多项（如离职+年假+报销），结论段分事项写全；依据段列对应 §。"
             "严格区分原文措辞：「必须/不得」=强制，「应/原则上」=一般要求，"
             "「建议/可」=非强制。不得把「原则上」写成「必须」。"
         )
@@ -325,10 +510,19 @@ class OpenAICompatLLM:
             "policy": context.get("policy"),
             "procedure": context.get("procedure"),
         }
+        from mycs.planning.chapter_hints import (
+            is_multi_part_question,
+            question_lines_for_seeding,
+        )
+
+        q = understood.raw_question or ""
+        sub_qs = question_lines_for_seeding(q) if is_multi_part_question(q) else []
         user = json.dumps(
             {
                 "intent": understood.intent,
-                "question": understood.raw_question,
+                "question": q,
+                "sub_questions": sub_qs,
+                "must_answer_every_sub_question": bool(sub_qs),
                 "tool_results": slim,
             },
             ensure_ascii=False,

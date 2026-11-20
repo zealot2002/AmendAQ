@@ -8,6 +8,8 @@ from mycs.models import KnowledgeRequirement, UnderstandResult
 class AgentLLM(Protocol):
     def understand(self, question: str, case_id: str | None) -> UnderstandResult: ...
 
+    def split_questions(self, question: str) -> dict[str, object]: ...
+
     def plan(
         self,
         understood: UnderstandResult,
@@ -34,6 +36,7 @@ class AgentLLM(Protocol):
         already_selected: list[dict[str, str]],
         batches_remaining: int,
         composite_query: bool = False,
+        enumerative_query: bool = False,
     ) -> dict[str, object]: ...
 
     def compose_answer(

@@ -15,6 +15,9 @@ _FACETS: list[tuple[list[str], list[str]]] = [
     (["安全", "访客"], ["安全", "访客"]),
     (["举报", "投诉"], ["举报", "问题"]),
     (["学习预算", "专业课程", "课程", "培训", "认证", "学习"], ["绩效", "发展"]),
+    (["AI", "智能推荐", "推荐号码", "推荐可靠", "数据分析", "走势图"], ["数据分析"]),
+    (["店主", "申请成为", "代销证", "入驻", "好势店主"], ["店主"]),
+    (["模拟选号", "选号", "购彩", "代购"], ["模拟选号", "订单代购"]),
 ]
 
 # Leaf title/summary hints for composite questions (multi-item recall).
@@ -24,6 +27,8 @@ _LEAF_FACETS: list[tuple[list[str], list[str]]] = [
     (["电脑", "笔记本", "财产", "归还"], ["财产", "电脑"]),
     (["离职", "辞职"], ["辞职", "离职", "财产"]),
     (["学习预算", "专业课程", "课程"], ["学习", "预算"]),
+    (["AI", "推荐可靠", "推荐号码", "智能推荐"], ["AI推荐", "推荐"]),
+    (["店主", "申请成为"], ["申请成为", "店主申请", "怎么申请"]),
 ]
 
 _COMPOSITE = re.compile(
@@ -32,6 +37,40 @@ _COMPOSITE = re.compile(
     re.I,
 )
 _OFFBOARDING = re.compile(r"离职|辞职|办理离职|交接", re.I)
+
+
+def is_multi_part_question(question: str) -> bool:
+    """用户一次输入多道独立小问题（换行或多问号）。"""
+    q = (question or "").strip()
+    if not q:
+        return False
+    lines = [ln.strip() for ln in q.splitlines() if ln.strip()]
+    if len(lines) >= 2:
+        return True
+    return len(re.findall(r"[?？]", q)) >= 2
+
+
+def question_lines_for_seeding(question: str) -> list[str]:
+    q = (question or "").strip()
+    if not q:
+        return []
+    if is_multi_part_question(q):
+        lines = [ln.strip() for ln in q.splitlines() if ln.strip()]
+        if len(lines) >= 2:
+            return lines
+    return [q]
+
+
+def merged_chapter_seeds(question: str, chapters: list[dict[str, Any]]) -> list[str]:
+    """Per sub-question facet → chapter; composite 时与 LLM 章选并集。"""
+    out: list[str] = []
+    seen: set[str] = set()
+    for sub in question_lines_for_seeding(question):
+        for ref in seed_chapter_refs_from_question(sub, chapters):
+            if ref not in seen:
+                seen.add(ref)
+                out.append(ref)
+    return out
 
 
 def is_composite_handbook_query(question: str) -> bool:

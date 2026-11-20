@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS kg_document (
     document_id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
     source_uri TEXT NOT NULL,
-    ingested_at TEXT NOT NULL
+    ingested_at TEXT NOT NULL,
+    catalog_mode TEXT NOT NULL DEFAULT 'hierarchical'
 );
 
 CREATE TABLE IF NOT EXISTS kg_entity (
@@ -54,7 +55,7 @@ CREATE TABLE IF NOT EXISTS kg_evidence (
 
 KG_SCHEMA_FOR_LLM = """
 Tables (read-only SELECT):
-- kg_document(document_id, title, source_uri, ingested_at)
+- kg_document(document_id, title, source_uri, ingested_at, catalog_mode)
 - kg_entity(entity_id, document_id, entity_type, name, summary, properties_json)
 - kg_entity_tag(entity_id, tag)
 - kg_relation(relation_id, document_id, from_entity_id, to_entity_id, predicate, properties_json)

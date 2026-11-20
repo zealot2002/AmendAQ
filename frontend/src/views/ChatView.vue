@@ -89,11 +89,11 @@
                   </p>
                 </template>
                 <p
-                  v-if="stepKind(ev).kind === 'llm' && !llmCalls(ev).length"
+                  v-if="llmCaptureMissing(ev)"
                   class="llm-missing-hint"
                 >
-                  未捕获到本步的大模型请求/响应。请重启 API 后重新提问；若仍为空，查看下方 Payload 中的
-                  llm_calls 字段。
+                  本步应有大模型调用，但未写入 llm_calls（多半是 API 进程过旧或捕获未初始化）。请重启 API
+                  后重问；若 Payload 里已有 llm_calls，可忽略此提示。
                 </p>
                 <template v-if="llmCalls(ev).length">
                   <p class="section-label">大模型 Prompt / 返回（{{ llmCalls(ev).length }} 次）</p>
@@ -176,6 +176,7 @@ const STEP_KIND_TAG: Record<string, StepKindMeta["tagType"]> = {
 const STEP_KIND_FALLBACK: Record<string, StepKindMeta> = {
   understand: { kind: "llm", label: "大模型", tagType: "primary" },
   toc_catalog_batch: { kind: "llm", label: "大模型", tagType: "primary" },
+  faq_title_batch: { kind: "llm", label: "大模型", tagType: "primary" },
   plan: { kind: "llm", label: "大模型", tagType: "primary" },
   answer: { kind: "llm", label: "大模型", tagType: "primary" },
   tool: { kind: "retrieval", label: "知识检索", tagType: "warning" },
@@ -208,6 +209,8 @@ function stepTitle(ev: ChatTraceEvent, idx: number) {
     base = "Plan 条号白名单";
   } else if (ev.step === "understand") {
     base = "理解问题";
+  } else if (ev.step === "faq_title_batch") {
+    base = "分批选 FAQ";
   } else if (ev.step === "toc_catalog_batch") {
     base = "分批选章";
   } else if (ev.step === "plan") {
@@ -222,7 +225,11 @@ function stepTitle(ev: ChatTraceEvent, idx: number) {
   if (ev.step === "tool" && p?.gap) {
     return `${idx + 1}. ${base} · ${String(p.gap)}`;
   }
-  if (ev.step === "toc_catalog_batch" && p?.batch_index && p?.batch_total) {
+  if (
+    (ev.step === "toc_catalog_batch" || ev.step === "faq_title_batch") &&
+    p?.batch_index &&
+    p?.batch_total
+  ) {
     return `${idx + 1}. ${base}（${p.batch_index}/${p.batch_total}）`;
   }
   if (ev.step === "toc_drill" && p?.level) {
@@ -283,6 +290,18 @@ function llmCalls(ev: ChatTraceEvent): LlmCallRecord[] {
   const p = ev.payload as Record<string, unknown> | undefined;
   const raw = p?.llm_calls;
   return Array.isArray(raw) ? (raw as LlmCallRecord[]) : [];
+}
+
+/** 仅当本步标明会调大模型、却没有任何 llm_calls 时提示异常。 */
+function llmCaptureMissing(ev: ChatTraceEvent): boolean {
+  const p = ev.payload as Record<string, unknown> | undefined;
+  if (p?.llm_invoked === false) {
+    return false;
+  }
+  if (stepKind(ev).kind !== "llm") {
+    return false;
+  }
+  return llmCalls(ev).length === 0;
 }
 
 function rawPayload(ev: ChatTraceEvent): Record<string, unknown> {

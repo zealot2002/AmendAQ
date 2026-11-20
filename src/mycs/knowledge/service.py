@@ -277,6 +277,20 @@ class KnowledgeService:
         chapters = slim_toc_choice(nodes)
         return {"document_id": document_id, "chapters": chapters, "count": len(chapters)}
 
+    def wiki_list_leaves(self, *, document_id: str) -> dict[str, Any]:
+        nodes = fetch_nodes(
+            self._conn,
+            document_id=document_id,
+            kinds=("leaf",),
+        )
+        leaves = slim_toc_choice(nodes)
+        return {"document_id": document_id, "leaves": leaves, "count": len(leaves)}
+
+    def document_catalog_mode(self, *, document_id: str) -> str:
+        from mycs.db.catalog_mode import get_catalog_mode
+
+        return get_catalog_mode(self._conn, document_id)
+
     def wiki_outline_for_chapters(
         self,
         *,

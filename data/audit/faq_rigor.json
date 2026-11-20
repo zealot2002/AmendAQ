@@ -1,0 +1,11 @@
+{
+  "document_id": "faq",
+  "status_filter": "published",
+  "ok": true,
+  "deterministic_issues": [],
+  "llm_issues": [],
+  "summary": "通过确定性校验",
+  "issue_count": 0,
+  "block_count": 0,
+  "ts": "2026-11-18T08:00:42.169428+00:00"
+}

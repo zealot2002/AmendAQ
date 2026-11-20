@@ -5,6 +5,7 @@ from pathlib import Path
 
 from mycs.db.connection import connect, get_db_path
 from mycs.log import get_logger
+from mycs.db.catalog_mode import migrate_kg_document_catalog_mode
 from mycs.db.schema_kg import KG_DDL
 from mycs.db.schema_wiki_toc import WIKI_TOC_DDL
 from mycs.graph.extract import SectionGraphBuilder
@@ -85,6 +86,7 @@ def _create_schema(conn) -> None:
         """
     )
     conn.executescript(KG_DDL)
+    migrate_kg_document_catalog_mode(conn)
     conn.executescript(WIKI_TOC_DDL)
     conn.executescript(
         """

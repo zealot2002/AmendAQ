@@ -5,6 +5,7 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
+from mycs.db.catalog_mode import infer_catalog_mode
 from mycs.db.connection import connect, get_db_path
 from mycs.graph.model import KnowledgeGraph
 from mycs.log import get_logger
@@ -17,6 +18,7 @@ def persist_graph(
     db_path: Path | None = None,
     *,
     conn: sqlite3.Connection | None = None,
+    catalog_mode: str | None = None,
 ) -> None:
     own_conn = conn is None
     if own_conn:
@@ -33,16 +35,18 @@ def persist_graph(
         conn.execute("DELETE FROM kg_entity WHERE document_id = ?", (graph.document_id,))
         conn.execute("DELETE FROM kg_document WHERE document_id = ?", (graph.document_id,))
 
+        mode = catalog_mode or infer_catalog_mode(graph.document_id)
         conn.execute(
             """
-            INSERT INTO kg_document (document_id, title, source_uri, ingested_at)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO kg_document (document_id, title, source_uri, ingested_at, catalog_mode)
+            VALUES (?, ?, ?, ?, ?)
             """,
             (
                 graph.document_id,
                 graph.title,
                 graph.source_uri,
                 datetime.now(timezone.utc).isoformat(),
+                mode,
             ),
         )
         seen: set[str] = set()

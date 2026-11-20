@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from mycs.models import KnowledgeRequirement, KnowledgeSource, UnderstandResult
 from mycs.planning.query_intent import is_whole_document_query, search_keywords_for
 
@@ -52,6 +54,8 @@ def normalize_requirements(
     for item in items:
         field = str(item.get("field") or "").strip()
         if not field:
+            continue
+        if field == "graph.entity.search":
             continue
         source = _source_from_item(item, field, intent)
         if source is None:
@@ -120,13 +124,13 @@ def _normalize_params(
     doc: str | None,
     question: str,
 ) -> dict:
-    if field == "graph.entity.search":
-        params.setdefault("query", search_keywords_for(question))
-        if doc:
-            params.setdefault("document_id", doc)
-        params.setdefault("limit", 8 if not is_whole_document_query(question) else 15)
-    elif field == "graph.entity.by_section" and doc:
+    if field == "graph.entity.by_section" and doc:
         params.setdefault("document_id", doc)
+        if params.get("section_ref") and not params.get("section"):
+            params["section"] = params.pop("section_ref")
+        sec = str(params.get("section") or "")
+        if sec and not re.match(r"^\d+(\.\d+)*\.?$", sec):
+            params.pop("section", None)
     elif field == "graph.read.query":
         params.setdefault("nl_query", question)
         if doc:
@@ -155,7 +159,6 @@ def _ensure_graph_baseline(
     has_retrieval = any(
         r.field
         in (
-            "graph.entity.search",
             "graph.entity.by_section",
             "graph.entity.catalog_match",
             "wiki.toc.branch",
@@ -176,18 +179,7 @@ def _ensure_graph_baseline(
                 ),
             ]
         return reqs
-    out = [
-        KnowledgeRequirement(
-            field="graph.entity.search",
-            source=KnowledgeSource.GRAPH,
-            params={
-                "query": search_keywords_for(question),
-                "document_id": doc,
-                "limit": 15 if is_whole_document_query(question) else 8,
-            },
-        ),
-        *reqs,
-    ]
+    out = list(reqs)
     if is_whole_document_query(question):
         out.append(
             KnowledgeRequirement(

@@ -25,6 +25,8 @@ _OUTLINE_SOURCE_ZH = {
     "chapter_filter": "按大模型选中的章，从数据库截取节/条摘要",
     "tool_outline": "通过知识工具拉取全量目录后再本地使用",
     "local_filter": "在目录结果上按 drill 范围本地过滤",
+    "flat_faq": "扁平 FAQ：仅已选问答标题（不下钻章）",
+    "comprehensive_toc": "全面目录：已选叶节点",
 }
 
 
@@ -62,6 +64,22 @@ def _llm_label(p: dict[str, Any] | None = None) -> str:
 
 
 def _narrate(step: str, p: dict[str, Any], *, question: str) -> dict[str, str]:
+    if step == "question_split":
+        qs = p.get("questions") or []
+        reason = str(p.get("reason") or "")
+        return {
+            "summary": f"调用 {_llm_label(p)}：将用户输入拆成 {len(qs)} 道独立子问题（专用 prompt，与检索无关）。",
+            "input": _clip(question, 400),
+            "output": "；".join(_clip(str(q), 120) for q in qs[:6]) or reason or "（未拆分）",
+        }
+
+    if step == "sub_question":
+        return {
+            "summary": "编排：对单个子问题走完整目录寻址 → 拉正文 → 作答。",
+            "input": _clip(str(p.get("text") or ""), 300),
+            "output": f"第 {int(p.get('index') or 0)}/{int(p.get('total') or 0)} 题",
+        }
+
     if step == "understand":
         intent = str(p.get("intent") or "")
         doc_id = str(p.get("graph_document_id") or "").strip()
@@ -195,6 +213,53 @@ def _narrate(step: str, p: dict[str, Any], *, question: str) -> dict[str, str]:
             "output": f"{action_zh}；选中 {picked}。{reason}".strip(),
         }
 
+    if step == "faq_title_batch":
+        bi = int(p.get("batch_index") or 0)
+        bt = int(p.get("batch_total") or 0)
+        action = str(p.get("action") or "")
+        refs = p.get("section_refs") or []
+        reason = str(p.get("reason") or "")
+        offered = p.get("entries_offered") or []
+        offered_txt = "、".join(
+            f"{c.get('section_ref', '')} {c.get('title', '')}".strip()
+            for c in offered
+            if isinstance(c, dict)
+        )[:400]
+        action_zh = {
+            "pick": "本批选中相关问答",
+            "continue": "本批无相关问答，继续下一批",
+        }.get(action, action)
+        picked = "、".join(str(r) for r in refs) if refs else "（本批未选）"
+        return {
+            "summary": f"调用 {_llm_label(p)}：FAQ 标题第 {bi}/{bt} 批（每批一次大模型）。",
+            "input": f"本批标题：{offered_txt or '—'}",
+            "output": f"{action_zh}；选中 {picked}。{reason}".strip(),
+        }
+
+    if step == "toc_children_batch":
+        bi = int(p.get("batch_index") or 0)
+        bt = int(p.get("batch_total") or 0)
+        action = str(p.get("action") or "")
+        refs = p.get("section_refs") or []
+        reason = str(p.get("reason") or "")
+        parent = f"{p.get('parent_section_ref', '')} {p.get('parent_title', '')}".strip()
+        offered = p.get("children_offered") or []
+        offered_txt = "、".join(
+            f"{c.get('section_ref', '')} {c.get('title', '')}".strip()
+            for c in offered
+            if isinstance(c, dict)
+        )[:400]
+        action_zh = {
+            "pick": "本批选中相关条目",
+            "continue": "本批无相关条目",
+        }.get(action, action)
+        picked = "、".join(str(r) for r in refs) if refs else "（本批未选条目）"
+        return {
+            "summary": f"调用 {_llm_label(p)}：子目录第 {bi}/{bt} 批（父：{parent or '—'}）。",
+            "input": f"本批条目：{offered_txt or '—'}",
+            "output": f"{action_zh}；选中 {picked}。{reason}".strip(),
+        }
+
     if step in ("outline", "toc"):
         n = int(p.get("outline_count") or 0)
         scoped = p.get("scoped")
@@ -228,6 +293,18 @@ def _narrate(step: str, p: dict[str, Any], *, question: str) -> dict[str, str]:
             field = str(r.get("field") or "")
             lines.append(f"{i}. {_GAP_ZH.get(field, field)}")
         body = "\n".join(lines) if lines else "（空计划）"
+        plan_ctx = p.get("plan_context") if isinstance(p.get("plan_context"), dict) else {}
+        if p.get("llm_invoked") is False or str(p.get("plan_source") or "") in (
+            "comprehensive_toc",
+            "flat_faq",
+        ):
+            n = len(reqs)
+            leaf_n = int(plan_ctx.get("wiki_toc_outline_count") or n)
+            return {
+                "summary": "编排：目录已选定叶节点，直接生成按条号拉正文计划（不调大模型）。",
+                "input": f"已选 {leaf_n} 条叶",
+                "output": body,
+            }
         return {
             "summary": f"调用 {_llm_label(p)}：把目录上下文转成「知识缺口」列表（本步消耗大模型）。",
             "input": _clip(question, 400),
