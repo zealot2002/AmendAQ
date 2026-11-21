@@ -77,6 +77,44 @@ class _CountingPickLLM:
         return {"action": "done", "section_refs": [str(batch[0]["section_ref"])], "reason": "one-shot"}
 
 
+def test_flat_faq_skips_rerank_when_under_top_k(monkeypatch):
+    monkeypatch.setenv("MYCS_FAQ_RECALL_MAX_PICKS", "5")
+
+    class _OrderedLLM:
+        def review_faq_title_batch(self, **kwargs: Any) -> dict[str, Any]:
+            batch = kwargs["entries_in_batch"]
+            order = [str(batch[1]["section_ref"]), str(batch[0]["section_ref"])]
+            return {"action": "pick", "section_refs": order, "reason": "order"}
+
+    flat = run_flat_faq_recall(
+        llm=_OrderedLLM(),
+        svc=_FakeLeavesSvc(),  # type: ignore[arg-type]
+        document_id="faq",
+        question="AI推荐",
+    )
+    assert flat.leaf_section_refs == ["§1.1", "§9.3"]
+
+
+def test_flat_faq_trims_excessive_llm_picks(monkeypatch):
+    monkeypatch.setenv("MYCS_FAQ_RECALL_MAX_PICKS", "2")
+
+    class _GreedyLLM:
+        def review_faq_title_batch(self, **kwargs: Any) -> dict[str, Any]:
+            batch = kwargs["entries_in_batch"]
+            refs = [str(c["section_ref"]) for c in batch]
+            return {"action": "done", "section_refs": refs, "reason": "all"}
+
+    svc = _FakeLeavesSvc()
+    flat = run_flat_faq_recall(
+        llm=_GreedyLLM(),
+        svc=svc,  # type: ignore[arg-type]
+        document_id="faq",
+        question="AI推荐",
+    )
+    assert len(flat.leaf_section_refs) <= 2
+    assert flat.leaf_section_refs
+
+
 def test_flat_faq_single_pass_under_max(monkeypatch):
     monkeypatch.setenv("MYCS_FAQ_SINGLE_PASS_MAX", "120")
 

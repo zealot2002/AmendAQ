@@ -13,7 +13,7 @@ export default defineConfig({
     port: Number(process.env.MYCS_WEB_PORT || 5180),
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:8765",
+        target: `http://127.0.0.1:${process.env.MYCS_API_PORT || "8765"}`,
         changeOrigin: true,
       },
     },

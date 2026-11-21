@@ -312,12 +312,19 @@ class OpenAICompatLLM:
         enumerative_query: bool = False,
         composite_query: bool = False,
         recall_exhaustive_batches: bool = True,
+        max_picks: int = 5,
     ) -> dict[str, Any]:
+        pick_cap = max(1, int(max_picks))
         enumerative_note = ""
         if enumerative_query:
             enumerative_note = (
-                "\n\n【列举类问题】须在多批中勾选与用户所问主题相关的 FAQ 条目；"
-                "不要勾选明显无关的标题。"
+                f"\n\n【列举类问题】只勾选与用户所问主题直接相关的 FAQ，"
+                f"最多 {pick_cap} 条；不要勾选明显无关的标题，严禁接近全选。"
+            )
+        else:
+            enumerative_note = (
+                f"\n\n【普通问答】只勾选最能直接回答用户问题的条目，"
+                f"通常 1～3 条，硬性上限 {pick_cap} 条；禁止勾选大批仅「有点相关」的标题。"
             )
         composite_note = ""
         if composite_query:
@@ -327,7 +334,7 @@ class OpenAICompatLLM:
         if batch_total <= 1:
             flow_note = (
                 "本次已展示本库**全部**问答标题（单批）。"
-                "请直接 pick 所有相关 section_ref；无需 continue。"
+                f"请只 pick 最相关的 section_ref（遵守 max_picks={pick_cap}），严禁接近全选。"
                 '可用 action=done 表示已选完。'
             )
         elif recall_exhaustive_batches:
@@ -364,12 +371,13 @@ class OpenAICompatLLM:
                 "entries_in_this_batch": entries_in_batch,
                 "enumerative_query": enumerative_query,
                 "composite_query": composite_query,
+                "max_picks": pick_cap,
             },
             ensure_ascii=False,
         )
         try:
-            cap = 2048 if batch_total <= 1 and entry_total > 24 else 768
-            data = self._json_chat(system, user, max_tokens=cap)
+            token_cap = 2048 if batch_total <= 1 and entry_total > 24 else 768
+            data = self._json_chat(system, user, max_tokens=token_cap)
             action = str(data.get("action") or "continue").lower()
             if recall_exhaustive_batches and action in ("done", "stop") and batches_remaining > 0:
                 action = "continue"

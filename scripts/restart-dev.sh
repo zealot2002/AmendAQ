@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # 一键停止并重启 mycs 开发环境（后端 API + 前端 Vite）
+# 默认监听 0.0.0.0，同一局域网同事可通过本机 IP 访问；仅本机请设 MYCS_BIND_HOST=127.0.0.1
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -17,6 +18,40 @@ export no_proxy="127.0.0.1,localhost,::1,${no_proxy:-}"
 
 log() {
   printf '[joyjoy] %s\n' "$*"
+}
+
+lan_ipv4() {
+  local iface ip
+  for iface in en0 en1 bridge0; do
+    ip="$(ipconfig getifaddr "$iface" 2>/dev/null || true)"
+    if [[ -n "$ip" ]]; then
+      printf '%s' "$ip"
+      return 0
+    fi
+  done
+  return 1
+}
+
+resolve_bind_host() {
+  printf '%s' "${MYCS_BIND_HOST:-${MYCS_API_HOST:-0.0.0.0}}"
+}
+
+print_access_urls() {
+  local port="$1"
+  local label="${2:-页面}"
+  log "本机 ${label}: http://127.0.0.1:${port}/"
+  if [[ "$BIND_HOST" == "127.0.0.1" ]]; then
+    log "当前仅本机可访问（MYCS_BIND_HOST=127.0.0.1）"
+    return 0
+  fi
+  local ip
+  if ip="$(lan_ipv4)"; then
+    log "同事 ${label}（同一 WiFi/局域网）: http://${ip}:${port}/"
+  else
+    log "未检测到局域网 IPv4；请在本机运行: ipconfig getifaddr en0"
+    log "同事访问: http://<你的局域网IP>:${port}/"
+  fi
+  log "若连不上：macOS 防火墙需放行 Python/终端入站；问答走 LLM 需本机 .env 已配置 Key"
 }
 
 kill_pid_file() {
@@ -89,12 +124,13 @@ start_api() {
   mkdir -p "$LOG_DIR"
   load_user_llm_env
   load_project_env
-  log "启动 API :${API_PORT} → $LOG_DIR/api.log (MYCS_LLM=${MYCS_LLM:-unset} GLM_MODEL=${GLM_MODEL:-unset})"
+  BIND_HOST="$(resolve_bind_host)"
+  log "启动 API ${BIND_HOST}:${API_PORT} → $LOG_DIR/api.log (MYCS_LLM=${MYCS_LLM:-unset} GLM_MODEL=${GLM_MODEL:-unset})"
   (
     cd "$ROOT"
     load_user_llm_env
     load_project_env
-    export MYCS_API_HOST="${MYCS_API_HOST:-127.0.0.1}"
+    export MYCS_API_HOST="${MYCS_API_HOST:-$BIND_HOST}"
     export MYCS_API_PORT="$API_PORT"
     exec uv run mycs-api
   ) >>"$LOG_DIR/api.log" 2>&1 &
@@ -106,11 +142,13 @@ start_web_dev() {
     log "安装前端依赖..."
     (cd "$ROOT/frontend" && npm install)
   fi
-  log "启动 Vite :${WEB_PORT} → $LOG_DIR/frontend.log"
+  BIND_HOST="$(resolve_bind_host)"
+  log "启动 Vite ${BIND_HOST}:${WEB_PORT} → $LOG_DIR/frontend.log"
   (
     cd "$ROOT/frontend"
     export MYCS_WEB_PORT="$WEB_PORT"
-    exec npm run dev -- --host 127.0.0.1 --port "$WEB_PORT"
+    export MYCS_API_PORT="$API_PORT"
+    exec npm run dev -- --host "$BIND_HOST" --port "$WEB_PORT"
   ) >>"$LOG_DIR/frontend.log" 2>&1 &
   echo $! >"$PID_WEB"
 }
@@ -139,6 +177,9 @@ wait_http() {
 
 log "=== mycs 开发环境重启 (mode=${MODE}) ==="
 stop_all
+load_user_llm_env
+load_project_env
+BIND_HOST="$(resolve_bind_host)"
 
 case "$MODE" in
   dev)
@@ -147,8 +188,8 @@ case "$MODE" in
     wait_http "http://127.0.0.1:${API_PORT}/api/health" "API" || true
     wait_http "http://127.0.0.1:${WEB_PORT}/" "前端" || true
     echo
-    log "前端: http://127.0.0.1:${WEB_PORT}/"
-    log "API:  http://127.0.0.1:${API_PORT}/api/health"
+    print_access_urls "$WEB_PORT" "前端（请把该地址发给同事）"
+    log "API 健康检查: http://127.0.0.1:${API_PORT}/api/health"
     log "日志: tail -f $LOG_DIR/api.log $LOG_DIR/frontend.log"
     log "停止: scripts/stop-dev.sh"
     ;;
@@ -157,13 +198,14 @@ case "$MODE" in
     start_api
     wait_http "http://127.0.0.1:${API_PORT}/api/health" "API" || true
     echo
-    log "单端口: http://127.0.0.1:${API_PORT}/"
+    print_access_urls "$API_PORT" "入口（单端口，请把该地址发给同事）"
     log "日志: tail -f $LOG_DIR/api.log"
     ;;
   *)
     echo "用法: $0 [dev|prod]" >&2
-    echo "  dev  — API + Vite（默认）" >&2
-    echo "  prod — npm build 后仅 API 托管 dist" >&2
+    echo "  dev  — API + Vite（默认，同事访问 Vite 端口）" >&2
+    echo "  prod — npm build 后仅 API 托管 dist（同事访问 API 端口）" >&2
+    echo "  仅本机在 .env 设 MYCS_BIND_HOST=127.0.0.1" >&2
     exit 1
     ;;
 esac

@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from mycs.knowledge.search import score_entity
 from mycs.knowledge.service import KnowledgeService
 from mycs.log import get_logger
 from mycs.log_detail import log_step
@@ -14,6 +15,8 @@ logger = get_logger(__name__)
 
 DEFAULT_BATCH_SIZE = 8
 DEFAULT_FAQ_SINGLE_PASS_MAX = 120
+DEFAULT_FAQ_RECALL_MAX_PICKS = 5
+DEFAULT_FAQ_RECALL_MAX_PICKS_ENUM = 24
 
 
 class FaqTitleReviewer(Protocol):
@@ -31,6 +34,7 @@ class FaqTitleReviewer(Protocol):
         enumerative_query: bool = False,
         composite_query: bool = False,
         recall_exhaustive_batches: bool = True,
+        max_picks: int = 5,
     ) -> dict[str, Any]: ...
 
 
@@ -48,6 +52,55 @@ def _batch_size() -> int:
 
 def _faq_single_pass_max() -> int:
     return max(8, int(os.environ.get("MYCS_FAQ_SINGLE_PASS_MAX", str(DEFAULT_FAQ_SINGLE_PASS_MAX))))
+
+
+def _recall_max_picks(*, enumerative_query: bool) -> int:
+    if enumerative_query:
+        return max(
+            1,
+            int(
+                os.environ.get(
+                    "MYCS_FAQ_RECALL_MAX_PICKS_ENUM",
+                    str(DEFAULT_FAQ_RECALL_MAX_PICKS_ENUM),
+                )
+            ),
+        )
+    return max(
+        1,
+        int(os.environ.get("MYCS_FAQ_RECALL_MAX_PICKS", str(DEFAULT_FAQ_RECALL_MAX_PICKS))),
+    )
+
+
+def _trim_faq_picks(
+    question: str,
+    nodes: list[dict[str, Any]],
+    *,
+    enumerative_query: bool,
+) -> tuple[list[dict[str, Any]], int]:
+    """When LLM picks more than max_picks, rerank by score_entity and trim."""
+    if not nodes:
+        return [], 0
+    cap = _recall_max_picks(enumerative_query=enumerative_query)
+    if len(nodes) <= cap:
+        return nodes, 0
+    scored: list[tuple[float, int, dict[str, Any]]] = []
+    for idx, node in enumerate(nodes):
+        title = str(node.get("title") or "")
+        summary = str(node.get("summary") or "")
+        scored.append((score_entity(question, title, summary), idx, node))
+    scored.sort(key=lambda row: (-row[0], row[1]))
+    kept = [row[2] for row in scored[:cap]]
+    dropped = max(0, len(nodes) - len(kept))
+    log_step(
+        logger,
+        "flat_faq_rerank_topk",
+        offered=len(nodes),
+        kept=len(kept),
+        max_picks=cap,
+        enumerative=enumerative_query,
+        dropped=dropped,
+    )
+    return kept, dropped
 
 
 def _faq_recall_exhaustive() -> bool:
@@ -79,9 +132,10 @@ def _forced_batch_faq_title_select(
     leaves: list[dict[str, Any]],
     enumerative_query: bool = False,
     composite_query: bool = False,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int]:
     if not leaves:
-        return [], []
+        return [], [], 0
+    pick_cap = _recall_max_picks(enumerative_query=enumerative_query)
     batch_size = _faq_effective_batch_size(len(leaves))
     exhaustive = _faq_recall_exhaustive()
     batches = [leaves[i : i + batch_size] for i in range(0, len(leaves), batch_size)]
@@ -119,6 +173,7 @@ def _forced_batch_faq_title_select(
             enumerative_query=enumerative_query,
             composite_query=composite_query,
             recall_exhaustive_batches=exhaustive,
+            max_picks=pick_cap,
         )
         action = str(decision.get("action") or "continue").lower()
         raw_refs = [str(r) for r in (decision.get("section_refs") or []) if r]
@@ -175,7 +230,31 @@ def _forced_batch_faq_title_select(
         if action in ("done", "stop") and batches_remaining > 0 and not exhaustive:
             break
 
-    return picked_nodes, batch_log
+        if len(picked_nodes) >= pick_cap:
+            log_step(
+                logger,
+                "flat_faq_pick_cap_reached",
+                cap=pick_cap,
+                picked=len(picked_nodes),
+            )
+            break
+
+    trimmed, dropped = _trim_faq_picks(
+        question,
+        picked_nodes,
+        enumerative_query=enumerative_query,
+    )
+    if dropped:
+        batch_log.append(
+            {
+                "phase": "faq_title_rerank",
+                "max_picks": _recall_max_picks(enumerative_query=enumerative_query),
+                "before": len(picked_nodes),
+                "after": len(trimmed),
+                "dropped_by_rank": dropped,
+            }
+        )
+    return trimmed, batch_log, dropped
 
 
 def run_flat_faq_recall(
@@ -212,7 +291,7 @@ def run_flat_faq_recall(
         leaf_total=len(leaves),
         enumerative_query=enumerative_query,
     )
-    picked, batch_log = _forced_batch_faq_title_select(
+    picked, batch_log, trim_dropped = _forced_batch_faq_title_select(
         llm,
         question=question,
         document_title=doc_title,
@@ -221,6 +300,8 @@ def run_flat_faq_recall(
         composite_query=composite_query,
     )
     result.trace_events.extend(batch_log)
+    if trim_dropped:
+        result.reason = "flat_faq_done_trimmed"
     leaf_by_ref: dict[str, dict[str, Any]] = {}
     for node in picked:
         ref = str(node.get("section_ref") or "")
