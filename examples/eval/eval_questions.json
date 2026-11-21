@@ -1,0 +1,102 @@
+{
+  "document_title": "Stellar Systems Demo",
+  "source_faq": "../demo/stellar_faq.en.txt",
+  "questions": [
+    {
+      "id": "Q01",
+      "question": "When is the quarterly bonus paid?",
+      "expected_refs": ["1.1"],
+      "expected_substrings": ["15th", "quarter", "business day"],
+      "expected_behavior": "answer",
+      "notes": "Direct recall of a single FAQ."
+    },
+    {
+      "id": "Q02",
+      "question": "How many remote work days are allowed per week?",
+      "expected_refs": ["1.2"],
+      "expected_substrings": ["two days", "remote"],
+      "expected_behavior": "answer",
+      "notes": "Numeric answer pulled from the source FAQ."
+    },
+    {
+      "id": "Q03",
+      "question": "What is the annual leave carry-over limit?",
+      "expected_refs": ["1.3"],
+      "expected_substrings": ["10 days", "carry over"],
+      "expected_behavior": "answer",
+      "notes": "Tests recall of a numeric limit."
+    },
+    {
+      "id": "Q04",
+      "question": "How do I report a lost company laptop?",
+      "expected_refs": ["1.4"],
+      "expected_substrings": ["2 hours", "IT Security", "security@stellar.example"],
+      "expected_behavior": "answer",
+      "notes": "Tests that the answer cites the correct channel."
+    },
+    {
+      "id": "Q05",
+      "question": "Can I accept a gift worth USD 250 from a partner?",
+      "expected_refs": ["1.5"],
+      "expected_substrings": ["200", "not", "exceeds"],
+      "expected_behavior": "answer",
+      "notes": "Question contains a number that exceeds the per-occasion limit."
+    },
+    {
+      "id": "Q06",
+      "question": "What should I do before resigning?",
+      "expected_refs": ["1.6"],
+      "expected_substrings": ["30", "resignation", "equipment", "expense"],
+      "expected_behavior": "answer",
+      "notes": "Multi-fact FAQ."
+    },
+    {
+      "id": "Q07",
+      "question": "Is it allowed to use a personal USB drive on a work laptop?",
+      "expected_refs": ["1.7"],
+      "expected_substrings": ["No", "not", "prohibited"],
+      "expected_behavior": "answer",
+      "notes": "Tests a clear prohibition."
+    },
+    {
+      "id": "Q08",
+      "question": "What is the dress code on Friday?",
+      "expected_refs": ["1.8"],
+      "expected_substrings": ["casual", "Friday"],
+      "expected_behavior": "answer",
+      "notes": "Tests a specific condition within a FAQ."
+    },
+    {
+      "id": "Q09",
+      "question": "How do I book a meeting room for 6 hours?",
+      "expected_refs": ["1.9"],
+      "expected_substrings": ["Stellar Calendar", "manager approval"],
+      "expected_behavior": "answer",
+      "notes": "Condition triggers a rule (over 4 hours)."
+    },
+    {
+      "id": "Q10",
+      "question": "Can I bring my pet to the office?",
+      "expected_refs": [],
+      "expected_substrings": [],
+      "expected_behavior": "refuse",
+      "notes": "Not in the corpus. The agent should refuse to answer."
+    },
+    {
+      "id": "Q11",
+      "question": "I have 8 unused leave days. How many can I carry over?",
+      "expected_refs": ["1.3"],
+      "expected_substrings": ["8", "10", "carry over"],
+      "expected_behavior": "answer",
+      "notes": "Tests numeric reasoning: 8 is below the 10-day cap."
+    },
+    {
+      "id": "Q12",
+      "question": "If the bonus payment date falls on a Sunday, when is it paid?",
+      "expected_refs": ["1.1"],
+      "expected_substrings": ["Friday", "business day", "before"],
+      "expected_behavior": "answer",
+      "notes": "Tests the holiday adjustment clause."
+    }
+  ]
+}
