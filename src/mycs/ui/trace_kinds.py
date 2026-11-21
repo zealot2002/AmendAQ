@@ -20,6 +20,8 @@ def resolve_step_kind(step: str, payload: dict[str, Any] | None = None) -> tuple
         return explicit, label
 
     if step == "understand":
+        if p.get("llm_invoked") is False:
+            return "pipeline", KIND_LABELS["pipeline"]
         return "llm", KIND_LABELS["llm"]
     if step == "toc_drill":
         mode = str(p.get("mode") or "")

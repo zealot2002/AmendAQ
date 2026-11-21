@@ -11,9 +11,17 @@ from mycs.db.catalog_mode import CATALOG_FLAT_FAQ
 from mycs.knowledge.service import KnowledgeService
 from mycs.llm.base import AgentLLM
 from mycs.llm.factory import create_llm
+from mycs.llm.patterns import CASE_ID_PATTERN
 from mycs.log import get_logger
 from mycs.log_detail import log_step, summarize_tool_result
-from mycs.models import AgentRunResult, KnowledgeRequirement, KnowledgeSource, TraceEvent, VerifyResult
+from mycs.models import (
+    AgentRunResult,
+    KnowledgeRequirement,
+    KnowledgeSource,
+    TraceEvent,
+    UnderstandResult,
+    VerifyResult,
+)
 from mycs.planning.plan_schema import apply_toc_section_whitelist
 from mycs.planning.resolver import GapResolver
 from mycs.skills.loader import evidence_text, load_skills, match_skills
@@ -63,6 +71,39 @@ def _sort_gaps(reqs: list[KnowledgeRequirement]) -> list[KnowledgeRequirement]:
     return sorted(reqs, key=lambda r: (_GAP_ORDER.get(r.field, 50), r.field))
 
 
+def _case_id_from_question(question: str, case_id: str | None) -> str | None:
+    if case_id:
+        return case_id
+    match = CASE_ID_PATTERN.search(question or "")
+    if match:
+        return match.group(0).upper()
+    return None
+
+
+def understand_for_question(
+    llm: AgentLLM,
+    question: str,
+    case_id: str | None,
+) -> tuple[UnderstandResult, bool]:
+    """When the page already picked a knowledge base, skip the understand model call."""
+    doc = os.environ.get("MYCS_GRAPH_DOCUMENT", "").strip()
+    if doc:
+        understood = UnderstandResult(
+            case_id=_case_id_from_question(question, case_id),
+            intent="graph_qa",
+            raw_question=question,
+            graph_document_id=doc,
+        )
+        log_step(
+            logger,
+            "agent_understand_skipped",
+            graph_document_id=doc,
+            case_id=understood.case_id,
+        )
+        return understood, False
+    return llm.understand(question, case_id), True
+
+
 class AgentLoop:
     def __init__(
         self,
@@ -106,8 +147,11 @@ class AgentLoop:
                 on_event(ev)
 
         log_step(logger, "agent_run_start", question=question[:400], case_id=case_id)
-        progress("正在理解您的问题…")
-        understood = self._llm.understand(question, case_id)
+        if os.environ.get("MYCS_GRAPH_DOCUMENT", "").strip():
+            progress("正在从已选知识库勾选问答…")
+        else:
+            progress("正在理解您的问题…")
+        understood, understood_by_llm = understand_for_question(self._llm, question, case_id)
         graph_doc_title = ""
         if understood.graph_document_id:
             _title_svc = KnowledgeService()
@@ -125,6 +169,7 @@ class AgentLoop:
                 "wiki_topics": understood.wiki_topics,
                 "graph_document_id": understood.graph_document_id,
                 "graph_document_title": graph_doc_title,
+                "llm_invoked": understood_by_llm,
             },
         )
         context: dict[str, Any] = {

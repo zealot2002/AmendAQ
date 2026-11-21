@@ -69,6 +69,12 @@ def _narrate(step: str, p: dict[str, Any], *, question: str) -> dict[str, str]:
         doc_id = str(p.get("graph_document_id") or "").strip()
         doc_name = str(p.get("graph_document_title") or "").strip()
         doc_label = doc_name or doc_id or "（未指定）"
+        if p.get("llm_invoked") is False:
+            return {
+                "summary": "知识库已选定，直接勾选问答，本步不调用大模型。",
+                "input": _clip(question, 500),
+                "output": f"类型：知识问答；知识库：{doc_label}",
+            }
         return {
             "summary": f"调用 {_llm_label(p)}：识别问题类型、关联手册（本步会消耗大模型配额）。",
             "input": _clip(question, 500),
