@@ -18,7 +18,23 @@
     </el-card>
 
     <el-card shadow="never" class="table-card">
-      <el-table :data="items" border stripe max-height="520" @row-click="(row: FaqItem) => openItemDialog(row)">
+      <div class="table-toolbar">
+        <el-input
+          v-model="keyword"
+          class="search"
+          clearable
+          :prefix-icon="Search"
+          :placeholder="T.searchFaq"
+        />
+      </div>
+      <el-table
+        v-if="filteredItems.length"
+        :data="filteredItems"
+        border
+        stripe
+        max-height="520"
+        @row-click="(row: FaqItem) => openItemDialog(row)"
+      >
         <el-table-column type="index" width="50" align="center" />
         <el-table-column :label="T.faqQuestion" min-width="200" show-overflow-tooltip>
           <template #default="{ row }">{{ row.question }}</template>
@@ -39,7 +55,13 @@
           </template>
         </el-table-column>
       </el-table>
-      <el-empty v-if="!pageLoading && !items.length" description="暂无问答，请新建或批量导入" />
+      <el-empty v-if="!pageLoading && !items.length" :description="T.faqEmpty">
+        <el-button type="primary" @click="openItemDialog()">{{ T.btnAddFaq }}</el-button>
+        <el-button @click="showImport = true">{{ T.btnBatchImport }}</el-button>
+      </el-empty>
+      <el-empty v-else-if="!pageLoading && !filteredItems.length" :description="T.searchNoMatch">
+        <el-button @click="keyword = ''">{{ T.searchClear }}</el-button>
+      </el-empty>
     </el-card>
 
     <el-dialog v-model="itemDialog" :title="editingItem ? '编辑问答' : T.btnAddFaq" width="560px" destroy-on-close>
@@ -76,6 +98,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
+import { Search } from "@element-plus/icons-vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { T } from "@/constants/terminology";
@@ -100,6 +123,7 @@ const { setDocumentId } = useDocumentId();
 const documentId = computed(() => String(route.params.documentId || ""));
 const library = ref<Library | null>(null);
 const items = ref<FaqItem[]>([]);
+const keyword = ref("");
 const pageLoading = ref(false);
 const publishing = ref(false);
 const itemDialog = ref(false);
@@ -109,6 +133,12 @@ const itemForm = reactive({ question: "", answer: "", status: "draft" });
 const showImport = ref(false);
 const importText = ref("");
 const importing = ref(false);
+
+const filteredItems = computed(() => {
+  const q = keyword.value.trim().toLowerCase();
+  if (!q) return items.value;
+  return items.value.filter((row) => `${row.question} ${row.answer}`.toLowerCase().includes(q));
+});
 
 async function reload() {
   const id = documentId.value;
@@ -262,6 +292,12 @@ onMounted(reload);
 }
 .table-card {
   background: #fff;
+}
+.table-toolbar {
+  margin-bottom: 12px;
+}
+.search {
+  width: min(360px, 100%);
 }
 .import-hint {
   font-size: 13px;

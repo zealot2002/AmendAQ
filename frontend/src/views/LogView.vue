@@ -17,7 +17,9 @@ import { T } from "@/constants/terminology";
   flex-direction: column;
   gap: 8px;
   background: #fff;
-  border-radius: 4px;
+  border: 1px solid #e7ebf0;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06);
   padding: 12px;
   box-sizing: border-box;
 }

@@ -21,7 +21,9 @@
                 </div>
               </div>
             </div>
-            <el-empty v-if="!messages.length" :description="T.chatEmpty" />
+            <el-empty v-if="!messages.length" :description="T.chatEmpty">
+              <el-button type="primary" @click="goLibrary">{{ T.chatGoLibrary }}</el-button>
+            </el-empty>
           </div>
           <div class="composer">
             <el-input
@@ -30,11 +32,11 @@
               :rows="3"
               placeholder="例如：年假可以结转吗？最多几天？"
               :disabled="loading"
-              @keydown.ctrl.enter="send"
+              @keydown="onComposerKeydown"
             />
             <div class="composer-actions">
               <span class="hint">
-                依据顶栏所选「问答知识库」中<strong>已上线</strong>的条目回答
+                连续按两次回车发送。依据顶栏所选「问答知识库」中<strong>已上线</strong>的条目回答
                 <template v-if="documentId">（{{ documentTitle || documentId }}）</template>
               </span>
               <el-button type="primary" :loading="loading" @click="send">发送</el-button>
@@ -135,14 +137,22 @@
 
 <script setup lang="ts">
 import { nextTick, ref } from "vue";
+import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { CircleCheck, Loading } from "@element-plus/icons-vue";
 import { T } from "@/constants/terminology";
 import { chatStream, type ChatTraceEvent } from "@/api/client";
 import { useDocumentId } from "@/composables/useDocumentId";
 
+const router = useRouter();
+
+function goLibrary() {
+  router.push({ name: "library" });
+}
+
 const { documentId, documentTitle } = useDocumentId();
 const question = ref("");
+const lastEnterAt = ref(0);
 const loading = ref(false);
 const messages = ref<
   { role: "user" | "assistant"; content: string; pending?: boolean; elapsedSeconds?: number }[]
@@ -330,6 +340,25 @@ async function scrollMessages() {
   scrollRef.value?.scrollTo({ top: scrollRef.value.scrollHeight, behavior: "smooth" });
 }
 
+function onComposerKeydown(event: KeyboardEvent) {
+  if (event.key !== "Enter" || event.repeat || event.shiftKey || event.altKey) return;
+  if (event.isComposing || event.keyCode === 229) return;
+  if (event.ctrlKey || event.metaKey) {
+    event.preventDefault();
+    lastEnterAt.value = 0;
+    void send();
+    return;
+  }
+  const now = performance.now();
+  if (now - lastEnterAt.value <= 600) {
+    event.preventDefault();
+    lastEnterAt.value = 0;
+    void send();
+    return;
+  }
+  lastEnterAt.value = now;
+}
+
 async function send() {
   const q = question.value.trim();
   if (!q || loading.value) return;
@@ -451,9 +480,10 @@ async function send() {
 .bubble {
   max-width: 85%;
   padding: 10px 12px;
-  border-radius: 6px;
+  border-radius: 10px;
   background: #fff;
   border: 1px solid #e4e7ed;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 .msg.user .bubble {
   background: #ecf5ff;

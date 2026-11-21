@@ -1,16 +1,22 @@
 <template>
   <el-container class="admin-root">
-    <el-aside width="200px" class="admin-aside">
+    <el-aside width="220px" class="admin-aside">
       <div class="logo">
-        <span class="logo-mark">M</span>
-        <span class="logo-text">ai客服</span>
+        <span class="logo-mark" aria-hidden="true">
+          <span class="logo-letter">M</span>
+          <span class="logo-sheen"></span>
+        </span>
+        <span class="logo-copy">
+          <span class="logo-text">ai客服</span>
+          <span class="logo-sub">知识问答</span>
+        </span>
       </div>
       <el-menu
         :default-active="activeMenu"
         router
-        background-color="#304156"
-        text-color="#bfcbd9"
-        active-text-color="#409eff"
+        background-color="transparent"
+        text-color="#c5d0dc"
+        active-text-color="#ffffff"
       >
         <el-menu-item index="/library">
           <el-icon><Collection /></el-icon>
@@ -182,32 +188,159 @@ onMounted(() => {
   min-height: 100vh;
 }
 .admin-aside {
-  background: #304156;
+  position: relative;
+  overflow: hidden;
   color: #fff;
+  background:
+    radial-gradient(140px 90px at 18% 0%, rgba(94, 184, 255, 0.34), transparent 72%),
+    linear-gradient(180deg, #172230 0%, #1e2c3c 46%, #141c27 100%);
+  box-shadow: inset -1px 0 0 rgba(150, 200, 255, 0.12);
+}
+.admin-aside::before {
+  content: "";
+  position: absolute;
+  inset: -40% -20% auto;
+  height: 220px;
+  background: radial-gradient(circle, rgba(120, 196, 255, 0.18), transparent 68%);
+  animation: aside-glow 7s ease-in-out infinite;
+  pointer-events: none;
 }
 .admin-aside :deep(.el-menu) {
+  position: relative;
   border-right: none;
+  padding-top: 8px;
+  background: transparent;
+}
+.admin-aside :deep(.el-menu-item) {
+  height: 44px;
+  margin: 4px 12px;
+  border-radius: 12px;
+  color: #c5d0dc;
+  transition: background-color 0.22s ease, color 0.22s ease, transform 0.22s ease, box-shadow 0.22s ease;
+}
+.admin-aside :deep(.el-menu-item .el-icon) {
+  transition: transform 0.22s ease, color 0.22s ease;
+}
+.admin-aside :deep(.el-menu-item:hover) {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  color: #fff !important;
+}
+.admin-aside :deep(.el-menu-item:hover .el-icon) {
+  transform: translateX(3px);
+}
+.admin-aside :deep(.el-menu-item.is-active) {
+  background: linear-gradient(90deg, rgba(79, 163, 255, 0.42), rgba(79, 163, 255, 0.12)) !important;
+  color: #fff !important;
+  box-shadow: inset 0 0 0 1px rgba(160, 214, 255, 0.38), 0 8px 18px rgba(20, 40, 70, 0.28);
+}
+.admin-aside :deep(.el-menu-item.is-active .el-icon) {
+  color: #d7ecff;
+  animation: icon-in 0.45s ease;
 }
 .logo {
-  height: 56px;
+  position: relative;
+  height: 72px;
   display: flex;
   align-items: center;
+  gap: 12px;
   padding: 0 16px;
-  font-size: 15px;
-  font-weight: 600;
   color: #fff;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 .logo-mark {
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  background: #409eff;
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-right: 10px;
-  font-size: 14px;
+  background: linear-gradient(145deg, #9ad4ff 0%, #3b8ef0 48%, #1d5fbe 100%);
+  box-shadow:
+    0 10px 22px rgba(47, 132, 232, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  animation: logo-float 4.8s ease-in-out infinite;
+}
+.logo-letter {
+  position: relative;
+  z-index: 1;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+.logo-sheen {
+  position: absolute;
+  inset: -40%;
+  background: linear-gradient(110deg, transparent 36%, rgba(255, 255, 255, 0.72) 50%, transparent 64%);
+  transform: translateX(-70%);
+  animation: logo-sheen 3.8s ease-in-out infinite;
+}
+.logo-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.logo-text {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.15;
+}
+.logo-sub {
+  margin-top: 2px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: rgba(206, 224, 242, 0.72);
+}
+@keyframes logo-sheen {
+  0%,
+  58% {
+    transform: translateX(-70%);
+  }
+  82%,
+  100% {
+    transform: translateX(70%);
+  }
+}
+@keyframes logo-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+@keyframes aside-glow {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate3d(12px, 18px, 0);
+    opacity: 1;
+  }
+}
+@keyframes icon-in {
+  0% {
+    transform: scale(0.82);
+  }
+  70% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-aside::before,
+  .logo-mark,
+  .logo-sheen,
+  .admin-aside :deep(.el-menu-item.is-active .el-icon) {
+    animation: none;
+  }
 }
 .admin-body {
   min-width: 0;
@@ -276,8 +409,9 @@ onMounted(() => {
   color: #909399;
 }
 .admin-main {
-  background: #f0f2f5;
+  background: #f4f6f8;
   min-height: calc(100vh - 56px);
+  padding: 16px 20px;
 }
 .admin-main--chat {
   overflow: hidden;

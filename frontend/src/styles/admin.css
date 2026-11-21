@@ -1,0 +1,102 @@
+:root {
+  --app-bg: #f4f6f8;
+  --app-card-radius: 10px;
+  --app-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06);
+  --app-row-hover: #f3f8ff;
+}
+
+.admin-main {
+  background: var(--app-bg);
+}
+
+.admin-main .el-card {
+  border: 1px solid #e7ebf0;
+  border-radius: var(--app-card-radius);
+  box-shadow: var(--app-shadow);
+}
+
+.admin-main .el-card__header {
+  font-weight: 600;
+}
+
+.admin-main .el-table {
+  --el-table-border-color: #eef1f5;
+  --el-table-header-bg-color: #f8fafc;
+}
+
+.admin-main .el-table .el-table__body tr {
+  transition: background-color 0.15s ease;
+}
+
+.admin-main .el-table .el-table__body tr:hover > td.el-table__cell {
+  background-color: var(--app-row-hover) !important;
+}
+
+.admin-main .el-tag {
+  border: none;
+  border-radius: 999px;
+  font-weight: 500;
+  padding: 0 8px;
+}
+
+.admin-main .el-tag.el-tag--success {
+  background: #e8f7ee;
+  color: #1f8a4c;
+}
+
+.admin-main .el-tag.el-tag--warning {
+  background: #fff4e5;
+  color: #b86e00;
+}
+
+.admin-main .el-tag.el-tag--info {
+  background: #eef1f6;
+  color: #5c6b7a;
+}
+
+.admin-main .el-button:not(.is-link):not(.is-text) {
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease, border-color 0.16s ease;
+}
+
+.admin-main .el-button--primary:not(.is-link):not(.is-text):not(.is-disabled):hover,
+.admin-main .el-button--success:not(.is-link):not(.is-text):not(.is-disabled):hover,
+.admin-main .el-button--danger:not(.is-link):not(.is-text):not(.is-disabled):hover {
+  transform: translateY(-1px);
+}
+
+.admin-main .el-button--primary:not(.is-link):not(.is-text):not(.is-disabled):hover {
+  box-shadow: 0 6px 14px rgba(64, 158, 255, 0.28);
+}
+
+.admin-main .el-button--success:not(.is-link):not(.is-text):not(.is-disabled):hover {
+  box-shadow: 0 6px 14px rgba(103, 194, 58, 0.24);
+}
+
+.admin-main .el-button--danger:not(.is-link):not(.is-text):not(.is-disabled):hover {
+  box-shadow: 0 6px 14px rgba(245, 108, 108, 0.24);
+}
+
+.admin-main .el-button.is-link,
+.admin-main .el-button.is-text {
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+.admin-main .el-button.is-link:hover,
+.admin-main .el-button.is-text:hover {
+  opacity: 0.82;
+}
+
+.admin-main .el-empty {
+  padding: 28px 0 36px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-main .el-button,
+  .admin-main .el-table .el-table__body tr {
+    transition: none;
+  }
+
+  .admin-main .el-button:hover {
+    transform: none;
+  }
+}

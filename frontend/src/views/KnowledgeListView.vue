@@ -1,14 +1,21 @@
 <template>
   <div class="library-page">
     <div class="toolbar">
+      <el-input
+        v-model="keyword"
+        class="search"
+        clearable
+        :prefix-icon="Search"
+        :placeholder="T.searchLibrary"
+      />
       <el-button type="primary" @click="openCreate">
         <el-icon class="btn-icon"><Plus /></el-icon>
         {{ T.btnAddLibrary }}
       </el-button>
     </div>
 
-    <el-card shadow="never" class="table-card">
-      <el-table :data="libraries" border stripe v-loading="loading" empty-text=" ">
+    <el-card shadow="never" class="table-card" v-loading="loading">
+      <el-table v-if="filtered.length" :data="filtered" border stripe>
         <el-table-column prop="title" :label="T.colLibraryName" min-width="180">
           <template #default="{ row }">
             <span class="name">{{ row.title || row.display_title || row.document_id }}</span>
@@ -36,6 +43,9 @@
       <el-empty v-if="!loading && !libraries.length" :description="T.libraryEmpty">
         <el-button type="primary" @click="openCreate">{{ T.btnAddLibrary }}</el-button>
       </el-empty>
+      <el-empty v-else-if="!loading && !filtered.length" :description="T.searchNoMatch">
+        <el-button @click="keyword = ''">{{ T.searchClear }}</el-button>
+      </el-empty>
     </el-card>
 
     <el-dialog
@@ -62,10 +72,10 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Plus } from "@element-plus/icons-vue";
+import { Plus, Search } from "@element-plus/icons-vue";
 import { T } from "@/constants/terminology";
 import {
   createLibrary,
@@ -81,6 +91,7 @@ import { formatApiError } from "@/api/httpError";
 type Row = Library & Mount;
 
 const libraries = ref<Row[]>([]);
+const keyword = ref("");
 const loading = ref(false);
 const saving = ref(false);
 const router = useRouter();
@@ -89,6 +100,15 @@ const dialogVisible = ref(false);
 const dialogMode = ref<"create" | "edit">("create");
 const editingId = ref("");
 const form = reactive({ title: "", description: "" });
+
+const filtered = computed(() => {
+  const q = keyword.value.trim().toLowerCase();
+  if (!q) return libraries.value;
+  return libraries.value.filter((row) => {
+    const name = `${row.title || ""} ${row.display_title || ""} ${row.description || ""}`.toLowerCase();
+    return name.includes(q);
+  });
+});
 
 function statusOf(row: Row) {
   const pub = row.published_leaves ?? 0;
@@ -200,8 +220,13 @@ onMounted(load);
 }
 .toolbar {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 12px;
+}
+.search {
+  width: min(360px, 100%);
 }
 .table-card {
   background: #fff;
