@@ -1,0 +1,29 @@
+Q1: When is the quarterly bonus paid?
+A1: Quarterly bonuses are paid on the 15th of the month following the close of the quarter. If the 15th is a weekend or public holiday, payment is made on the last business day before it.
+
+Q2: How many remote work days are allowed per week?
+A2: Employees may work remotely up to two days per week, arranged with their direct manager. Days must not be split into half-days.
+
+Q3: What is the annual leave carry-over limit?
+A3: Employees may carry over up to 10 days of unused annual leave into the next calendar year. Any days above 10 are forfeited.
+
+Q4: How do I report a lost company laptop?
+A4: Report a lost company laptop to IT Security within 2 hours of discovering the loss, even if it happens outside business hours. Email security@stellar.example or call the IT hotline.
+
+Q5: What is the gift acceptance policy?
+A5: Employees may accept gifts from business partners up to a value of USD 200 per occasion and USD 500 per year. Gifts must not create a conflict of interest or the appearance of one. Cash and cash equivalents are never allowed.
+
+Q6: What should I do before resigning?
+A6: Submit a written resignation to your manager at least 30 calendar days before your intended last working day. Return all company equipment, settle outstanding expense claims, and hand over active projects.
+
+Q7: Can I use a personal USB drive on my work laptop?
+A7: No. Only company-approved storage devices may be connected to work laptops. Personal USB drives, external hard disks, and phones used as storage are prohibited.
+
+Q8: What is the dress code?
+A8: Business casual is expected Monday through Thursday. Casual attire is allowed on Fridays, provided it is clean and presentable for video calls.
+
+Q9: How do I book a meeting room?
+A9: Use the Stellar Calendar app. Bookings over 4 hours require manager approval.
+
+Q10: Does the company provide gym memberships?
+A10: The company does not provide gym memberships. Employees may use the wellness allowance of USD 300 per year for fitness-related expenses.

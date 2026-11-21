@@ -1,0 +1,102 @@
+{
+  "document_title": "星际系统演示",
+  "source_faq": "../demo/stellar_faq.zh.txt",
+  "questions": [
+    {
+      "id": "Q01",
+      "question": "季度奖金什么时候发放？",
+      "expected_refs": ["1.1"],
+      "expected_substrings": ["15", "季度", "工作日"],
+      "expected_behavior": "answer",
+      "notes": "直接召回单条 FAQ。"
+    },
+    {
+      "id": "Q02",
+      "question": "每周最多可远程办公几天？",
+      "expected_refs": ["1.2"],
+      "expected_substrings": ["两天", "远程"],
+      "expected_behavior": "answer",
+      "notes": "从原文中提取数值。"
+    },
+    {
+      "id": "Q03",
+      "question": "年假可结转上限是多少？",
+      "expected_refs": ["1.3"],
+      "expected_substrings": ["10", "结转"],
+      "expected_behavior": "answer",
+      "notes": "测试数值上限的召回。"
+    },
+    {
+      "id": "Q04",
+      "question": "公司笔记本丢失如何报告？",
+      "expected_refs": ["1.4"],
+      "expected_substrings": ["2小时", "IT", "security@stellar.example"],
+      "expected_behavior": "answer",
+      "notes": "测试是否引用正确渠道。"
+    },
+    {
+      "id": "Q05",
+      "question": "我可以接受合作伙伴送的 250 美元礼品吗？",
+      "expected_refs": ["1.5"],
+      "expected_substrings": ["200", "不能", "超过"],
+      "expected_behavior": "answer",
+      "notes": "问题中的金额超过单次上限。"
+    },
+    {
+      "id": "Q06",
+      "question": "辞职前需要做什么？",
+      "expected_refs": ["1.6"],
+      "expected_substrings": ["30", "辞职", "设备", "费用"],
+      "expected_behavior": "answer",
+      "notes": "包含多个事实的 FAQ。"
+    },
+    {
+      "id": "Q07",
+      "question": "可以在工作笔记本上用个人 U 盘吗？",
+      "expected_refs": ["1.7"],
+      "expected_substrings": ["不可以", "禁止"],
+      "expected_behavior": "answer",
+      "notes": "测试明确禁止类问题。"
+    },
+    {
+      "id": "Q08",
+      "question": "周五的着装要求是什么？",
+      "expected_refs": ["1.8"],
+      "expected_substrings": ["便装", "周五"],
+      "expected_behavior": "answer",
+      "notes": "测试 FAQ 中的具体条件。"
+    },
+    {
+      "id": "Q09",
+      "question": "如何预订 6 小时的会议室？",
+      "expected_refs": ["1.9"],
+      "expected_substrings": ["Stellar Calendar", "经理批准"],
+      "expected_behavior": "answer",
+      "notes": "触发超过 4 小时的规则。"
+    },
+    {
+      "id": "Q10",
+      "question": "可以带宠物来办公室吗？",
+      "expected_refs": [],
+      "expected_substrings": [],
+      "expected_behavior": "refuse",
+      "notes": "语料中没有该问题，应当拒答。"
+    },
+    {
+      "id": "Q11",
+      "question": "我还有 8 天年假没休，可以结转多少天？",
+      "expected_refs": ["1.3"],
+      "expected_substrings": ["8", "10", "结转"],
+      "expected_behavior": "answer",
+      "notes": "测试数值推理：8 天低于 10 天上限。"
+    },
+    {
+      "id": "Q12",
+      "question": "如果奖金发放日是周日，会提前到什么时候发？",
+      "expected_refs": ["1.1"],
+      "expected_substrings": ["周五", "工作日", "提前"],
+      "expected_behavior": "answer",
+      "notes": "测试节假日调整条款。"
+    }
+  ]
+}

@@ -22,9 +22,13 @@ This is the runnable slice of a larger idea: RAG should end in knowledge, not in
 | Verification | Often none, or "do you think this is correct?" | Deterministic rules: cited source, no invented obligations, no contradiction |
 | Failure mode | Hallucinates an answer from nearby chunks | Empty recall → refuses to answer |
 
-## Screenshot / GIF
+## Screenshot
 
-The Vue admin UI includes a process panel on the right side of the chat page that shows every step: skip-understand, title-batch selection, tool calls, compose, and rule verification. A screenshot or GIF of this panel should be added here. (No fake screenshot is included in this PR.)
+The Vue admin UI includes a process panel on the right side of the chat page that shows every step: skip-understand, title-batch selection, tool calls, compose, and rule verification.
+
+![Process panel](docs/images/process-panel-devto.png)
+
+> This is a real capture from the [Dev.to series](https://dev.to/zealot2002/series/47162). It shows the older Xinghe demo data, but the visible workflow is the same one this repo runs today: skip understand, batch-select FAQ IDs, load full texts, verify by rules.
 
 ## Quick start (Vue / mycs-api path)
 
@@ -50,25 +54,21 @@ scripts/restart-dev.sh
 
 The script installs frontend dependencies if needed, starts the FastAPI backend (`mycs-api`) on port `8765`, and starts the Vite frontend on port `5180`. It prints the local URL, usually `http://127.0.0.1:5180/`.
 
-3. Open the printed URL, create a library, and import a few Q&A items.
+3. Seed the bundled demo corpus:
 
-Use the **Batch Import** format:
-
-```text
-Q1: How do I reset my password?
-A1: Go to Settings → Account → Reset Password and follow the email link.
-
-Q2: What are your support hours?
-A2: Live chat is available 09:00–18:00 UTC on business days.
+```bash
+uv run python examples/demo/import_demo.py
 ```
 
-4. Click **Publish** so the items become visible to the agent.
+This creates a fictional library called **Stellar Systems Demo** and imports the 10 Q&A pairs from `examples/demo/stellar_faq.en.txt` as published items.
 
-5. Go to **Chat**, select the library, and ask example questions:
+4. Open the printed URL, go to **Knowledge Base**, click the **Stellar Systems Demo** library, and confirm the items are published.
 
-- "How do I reset my password?"
-- "What are your support hours?"
-- "Can I call support on Saturday?"
+5. Go to **Chat**, select the demo library, and ask:
+
+- "When is the quarterly bonus paid?"
+- "How many remote work days are allowed per week?"
+- "Can I bring my pet to the office?" (not in the demo corpus — expect a refusal)
 
 Watch the right-hand process panel: it shows whether the model skipped the understand step, which FAQ IDs it ticked, what full texts were loaded, and whether rule verification passed.
 
@@ -94,14 +94,25 @@ The CLI path is advanced; the Vue UI is the recommended first entry.
 
 ## Evaluation / reproducibility
 
-Be honest: the **Xinghe 13-question benchmark** discussed in the blog is **not reproducible from this repo**.
+A bundled, runnable evaluation is now in `examples/eval/`:
 
-- `scripts/run_xinghe_eval.py` only contains 10 questions, not 13.
+```bash
+uv run python examples/eval/run_eval.py        # English FAQ + questions
+uv run python examples/eval/run_eval.py --lang zh  # Chinese FAQ + questions
+```
+
+It imports the fictional **Stellar Systems Demo** FAQ from `examples/demo/`, runs 12 questions through `AgentLoop`, and scores each answer with the rubric in `examples/eval/RUBRIC.md`. The questions are designed to show the product's strengths (ID selection, rule verification, program-computed numeric answers, refusal when missing). A dry-run mode is available that imports and validates the data without calling an LLM:
+
+```bash
+uv run python examples/eval/run_eval.py --dry-run
+```
+
+The original **Xinghe 13-question benchmark** discussed in the blog is **still not reproducible from this repo**:
+
+- `scripts/run_xinghe_eval.py` only contains 10 questions, not 13, and now carries a clear header note.
 - The source handbook file (`docs/星河科技_中文员工手册_知识库测试.txt`) is missing, so the script cannot re-ingest the evaluated document.
 - Some older wiki-tree evaluation reports are stale.
 - Some tests hard-code local desktop paths.
-
-You can still run a demo: create a library, import your own Q&A, publish it, and ask questions while watching the process panel. A reproducible evaluation set and a shared demo corpus are still being collected.
 
 ## Limits and roadmap
 
