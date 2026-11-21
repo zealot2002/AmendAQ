@@ -114,15 +114,6 @@ def run_leaf_section_select(
                 selected_set.add(ref)
                 selected.append(ref)
 
-        if action in ("done", "stop") and batches_remaining == 0:
-            result.section_refs = selected
-            result.reason = reason or "done"
-            return result
-        if action in ("pick", "select") and refs and batches_remaining == 0:
-            result.section_refs = selected
-            result.reason = reason or "last_batch"
-            return result
-
     result.section_refs = selected
     result.reason = "exhausted_batches" if selected else "no_pick"
     if not selected and len(leaves) == 1:

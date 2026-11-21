@@ -87,7 +87,8 @@
 
     <el-dialog v-model="showImport" :title="T.batchImportTitle" width="640px" destroy-on-close>
       <p class="import-hint">{{ T.batchImportHint }}</p>
-      <el-input v-model="importText" type="textarea" :rows="14" :placeholder="T.batchImportPlaceholder" />
+      <pre class="import-sample">{{ T.batchImportExample }}</pre>
+      <el-input v-model="importText" type="textarea" :rows="10" :placeholder="T.batchImportPlaceholder" />
       <template #footer>
         <el-button @click="showImport = false">取消</el-button>
         <el-button type="primary" :loading="importing" @click="doImport">导入为草稿</el-button>
@@ -302,7 +303,19 @@ onMounted(reload);
 .import-hint {
   font-size: 13px;
   color: #606266;
-  line-height: 1.5;
+  line-height: 1.6;
+  margin: 0 0 8px;
+}
+.import-sample {
   margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f6f8fb;
+  border: 1px solid #e7ebf0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  color: #303133;
 }
 </style>

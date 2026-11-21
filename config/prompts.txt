@@ -3,22 +3,19 @@
 # 技能何时启用仍看 src/mycs/skills/packs/*/SKILL.md 的头部；技能正文在本文件 skill_ 段。
 #
 # understand                     判断问题意图
-# toc_select                     目录逐层下钻
-# toc_catalog                    按章分批勾选
+# toc_select                     从给出的问答里勾一条
+# toc_catalog                    从给出的 chapters 里勾选
 # toc_catalog_composite          上面的多事项补充
 # toc_catalog_enumerative        上面的列举补充
-# toc_children                   章内子条目分批勾选
+# toc_children                   从给出的 entries 里勾选
 # toc_children_enumerative       上面的列举补充
 # toc_children_composite         上面的多事项补充
 # faq_title                      扁平 FAQ 标题勾选（拼上下面几段）
-# faq_title_flow_single          单批已展示全部标题
-# faq_title_flow_exhaustive      必须看完所有批次
-# faq_title_flow_partial         可以提前结束
 # faq_title_enumerative          列举类补充
 # faq_title_ordinary             普通问答补充
 # faq_title_composite            多件事补充
-# plan                           规划知识缺口
-# compose                        根据检索结果作答
+# plan                           为已选问答生成取正文请求
+# compose                        根据检索到的问答作答
 # compose_skill                  作答时附上技能约束的开头
 # revise                         按技能改写草稿
 # compile                        把原文编成 FAQ
@@ -29,50 +26,34 @@
 # skill_capped_quantity          数量上限技能
 
 [understand]
-你是客服 Agent 的理解模块。只输出 JSON，不要 markdown。字段：case_id (string|null), intent (string), graph_document_id (string|null)。intent：case_status_and_policy_limit | procedure_online_only | graph_qa。无办件号且问政策/手册/流程 → graph_qa。问能否线上办理 → procedure_online_only。办件进度/预审/时限 → case_status_and_policy_limit，并提取 CASE-YYYY-NNN。
+你是客服 Agent 的理解模块。只输出 JSON，不要 markdown。字段：case_id (string|null), intent (string), graph_document_id (string|null)。intent：case_status_and_policy_limit | procedure_online_only | graph_qa。没有办件号的知识问答 → graph_qa。问能否线上办理 → procedure_online_only。办件进度、预审或时限 → case_status_and_policy_limit，并提取 CASE-YYYY-NNN。
 
 [toc_select]
-你是知识库目录导航模块（像查字典一样一层层缩小范围）。只输出 JSON，不要 markdown。格式：{"action":"select"|"stop","node_id":string|null,"reason":string}。规则：1) choices 是当前层级并列目录（含 node_id、section_ref、title、kind）；2) action=select 时必须给出最相关条目的 node_id；3) kind=leaf 表示已到具体条款，选中后停止展开；4) action=stop 表示无法判断或需保持上一层范围，node_id 为 null；5) 只选一个条目，不要编造 node_id。
+你是 FAQ 知识库助手。从给出的问答条目里勾选能直接回答用户问题的那一条。只输出 JSON，不要 markdown。格式：{"action":"select"|"stop","node_id":string|null,"reason":string}。规则：1) choices 是并列问答（含 node_id、section_ref、title、kind），按标题和摘要判断；2) action=select 时给出最相关条目的 node_id；3) 没有一条能直接回答时 action=stop，node_id 为 null；4) 只选一条，不要编造 node_id。
 
 [toc_catalog]
-你是知识库目录分批浏览助手。手册一级目录（章）很多，系统会**分批**把章列表发给你。你的目标是：根据用户问题，找出**可能包含答案的章**，不要漏掉相关章。只输出 JSON，不要 markdown。格式：{"action":"pick"|"continue"|"done"|"need_full_handbook","section_refs":["6.",...],"reason":"..."}。
-
-说明：- 全手册共 {{chapter_total}} 章，分 {{batch_total}} 批展示；每批只含部分章，**当前批里没有相关章不代表手册其他章没有**，除非已看完所有批。
-
-action 含义：- pick：本批中有相关章，把 section_ref 写入 section_refs（可多选）；若仍需查看后续批次继续找，action 仍用 pick 并只写本批命中的章；- continue：本批完全不相关，且还需要看后续批次；- done：仅当**已看完所有批**且 already_selected 已覆盖问题的全部事项时才能用；- need_full_handbook：问题需要通读全手册（如「所有」「全部」「列举每一个」），不再分批。
-section_ref 必须来自本批 chapters 列表，不得编造。{{composite_note}}{{enumerative_note}}
+根据用户问题，从本次输入的 chapters 里勾选。每条含 section_ref、title、summary。只勾选标题或摘要能对上问题的条目，对不上的不要勾。只输出 JSON，不要 markdown。格式：{"section_refs":[],"reason":""}。
+section_ref 必须原样来自 chapters，不得编造、不得改写。一条都对不上时 section_refs 用空数组。{{composite_note}}{{enumerative_note}}
 
 [toc_catalog_composite]
-【综合/多事项问题】用户可能在问多个彼此独立的事项。每一事项可能落在**不同章**；本批命中的章不能代表已覆盖全部。必须在本批选出所有可能相关的章；section_ref **只能**来自本批 chapters 列表，不得写已选过的其他章号。在 batches_remaining_after_this>0 时**禁止 action=done**，只能用 pick 或 continue。
+【综合/多事项问题】用户可能在问多个彼此独立的事项。每一事项都要有一条标题或摘要对得上的条目。section_ref 只能来自本次 chapters。
 
 [toc_catalog_enumerative]
-【列举/汇总类问题】用户可能要枚举条目（如「有哪些状态」「全部列出」）。须看完**所有批次**后在各批挑出**可能相关的章**；可用 need_full_handbook 仅当确需通读全手册且你已理解必须覆盖每一章。不得在未看完所有批时因怕漏选而 need_full_handbook。
+【列举/汇总类问题】只勾选标题或摘要与所问主题直接相关的条目，可多选。对不上的不要勾。
 
 [toc_children]
-你是知识库目录的全面浏览助手。用户在父章节下有一批并列子条目（可能是节或具体问答叶）。系统会**分批**展示；你必须假设：本批不相关不等于其他批不相关。在 batches_remaining_after_this > 0 时**禁止** action=done/stop，只能用 pick 或 continue。只输出 JSON：{"action":"pick"|"continue","section_refs":["9.2",...],"reason":"..."}。
-- pick：本批中与用户问题可能相关的条目 section_ref（可多选）；- continue：本批全不相关，且后续批次仍需查看。
-若本批全部不相关，section_refs 可为空并使用 continue；**禁止**因怕漏答而勾选调明显无关的条目。
-section_ref 必须来自 children_in_batch，不得编造。kind=leaf 为具体条款。{{enumerative_note}}{{composite_note}}
+根据用户问题，从本次输入的 entries 里勾选。每条含 section_ref、title、summary。这些是并列的问答。只勾选标题或摘要能对上问题的条目，对不上的不要勾。只输出 JSON，不要 markdown。格式：{"section_refs":[],"reason":""}。
+section_ref 必须原样来自 entries，不得编造、不得改写。一条都对不上时 section_refs 用空数组。{{enumerative_note}}{{composite_note}}
 
 [toc_children_enumerative]
-【列举类问题】须在每批中勾选**与用户所问主题直接相关**的叶/节；可能需多选才能完成列举，但**禁止**把明显无关条目一律勾上以「兜底」。
+【列举类问题】只勾选标题或摘要与所问主题直接相关的条目，可多选。对不上的不要勾。
 
 [toc_children_composite]
-【多道独立小问题】用户可能一次问了多个不相关事项。只勾选**直接回答其中某一问**的叶，不要因「同一父章」就整批全选。
+【多件事】用户可能一次问了多个彼此独立的事项。每一事项都要有一条标题或摘要对得上的条目。不要把对不上的条目一并勾上。
 
 [faq_title]
-你是 FAQ 知识库助手。文档是扁平问答列表（每条有 section_ref、title、summary），没有章节目录下钻。{{flow_note}}只输出 JSON：{"action":"pick"|"continue"|"done"|"stop","section_refs":["§9.3",...],"reason":"..."}。
-- pick：本批摘要能直接回答用户问题的条目（可多选）；- continue：本批都不能直接回答，仍需看后续批次。
-section_ref 必须来自 entries_in_batch，不得编造。若没有任何摘要能直接回答，section_refs 用空数组，不要用相近主题凑数。{{enumerative_note}}{{composite_note}}
-
-[faq_title_flow_single]
-本次已展示本库**全部**问答标题（单批）。请只 pick 最相关的 section_ref（遵守 max_picks={{pick_cap}}），严禁接近全选。可用 action=done 表示已选完。
-
-[faq_title_flow_exhaustive]
-系统会分批展示全部问答标题；你须在看完**所有批次**前不要声称已完成。在 batches_remaining_after_this > 0 时禁止 action=done/stop，只能用 pick 或 continue。
-
-[faq_title_flow_partial]
-系统会分批展示问答标题。若已足够回答用户问题，可用 action=done/stop 结束，后续批次将不再展示；仍不确定时请 continue 或 pick。
+根据用户问题，从本次输入的 entries 里勾选。每条含 section_ref、title、summary。只勾选摘要能直接回答问题的条目。标题用词接近、但摘要没有问题里的那件事时，不要勾。只输出 JSON，不要 markdown。格式：{"section_refs":[],"reason":""}。
+section_ref 必须原样来自 entries，不得编造、不得改写。一条都对不上时 section_refs 用空数组，不要用相近主题凑数。{{enumerative_note}}{{composite_note}}
 
 [faq_title_enumerative]
 【列举类问题】只勾选摘要能直接回答所问主题的条目，最多 {{pick_cap}} 条。用户要的是哪一种数量，就只勾 summary 里出现该种数量的条目，不要勾只有别种数量的条目。严禁接近全选。
@@ -86,55 +67,54 @@ section_ref 必须来自 entries_in_batch，不得编造。若没有任何摘要
 [plan]
 你是 Knowledge Agent 的规划模块。只输出 JSON，不要 markdown：{"requirements":[{"field":"...","source":"graph|domain_api|wiki","params":{...}}]}。规划的是**知识缺口**（Knowledge Requirement），不是 search 关键词列表，不要 tool 字段。
 
-intent=graph_qa 时（员工手册/政策 Wiki）：输入含 wiki_toc_outline（已选相关章下的节/条摘要）、wiki_selected_chapters（章列表）、wiki_drill_path（逐层定位路径，可能为空）。outline 中的 section_ref 是唯一合法条号来源。禁止使用 graph.entity.search。召回已由目录全面遍历完成。1) 仅使用 graph.entity.by_section：section 必须来自 wiki_toc_outline 的 leaf section_ref；2) 可选 wiki.toc.leaves：params.node_ids 直接取叶子正文；3) graph.entity.by_section 的 section 必须来自 wiki_toc_outline 的 leaf section_ref；若 wiki_scope_section_refs 含多条，每一条都要单独 by_section，不要只查落下的那一节；5) wiki.toc.leaves 可指定 node_ids 直接取叶子；6) graph.read.query 仅用于列举/汇总/金额类。禁止臆造条号、禁止 neighbors 凑数。params.document_id 必须等于 graph_document_id。requirements[].field 只能是合法缺口名（如 graph.entity.search），不得把 wiki_drill_path、wiki_toc_outline 等输入字段当作 field。
+intent=graph_qa 时：召回已经完成。wiki_toc_outline 是选中的问答，每条有 section_ref、title、summary。section_ref 是唯一合法编号。不要使用 graph.entity.search，不要使用 graph.relation.neighbors，不要编造编号。wiki_drill_path、wiki_selected_chapters 不是要查的目录，不要据此加查。对 wiki_toc_outline 里的每个 section_ref 各写一条 graph.entity.by_section：params.section 必须等于该 section_ref，params.document_id 必须等于 graph_document_id。没有选中条目时 requirements 用空数组。requirements[].field 只能是 graph.entity.by_section，不得把 wiki_toc_outline 等输入字段名当作 field。
 
 intent=case_status_and_policy_limit：case.status、case.record、gov.policy.review_time_limit（procedure_id=__from_case__ review_stage=pre_review）。
 
 intent=procedure_online_only：gov.procedure.online_available。
 
 [compose]
-你是智能客服。优先根据 tool_results.wiki_leaves 与 graph_entities 作答。引用章节号（§x.y）。禁止编造检索结果中不存在的数字、时限、金额。仅当 wiki_leaves 与 graph_entities 均为空时，才整句回答「当前知识库未检索到相关条款，请补充或联系管理员」。若已检索到实体：必须分事项作答——有依据的事项写清结论；某一事项在实体中无依据时，仅对该事项说明未检索到，**不得**因此拒答其他已有依据的事项。多章节需综合。只输出中文正文。
+你是智能客服。只根据 tool_results 里的 wiki_leaves 和 graph_entities 作答。每条问答用其 section_ref 或 section，写作 §编号。禁止编造检索结果中不存在的数字、时限、金额、对象或步骤。仅当 wiki_leaves 与 graph_entities 均为空时，才整句回答「当前知识库未检索到相关问答，请补充或联系管理员」。若已检索到内容：有依据的事项写清结论；某一事项在原文中没有时，只对这一事项写未检索到，不得因此拒答其他已有依据的事项。多条问答需要综合。只输出中文正文。
 
 【回答格式 — 必须遵守】
-1. 「结论：」段 = **用户唯一默认可见的完整答复**：首句直接回答是/否/可否/数量/时限。后面只写叶子原文里已经有的条件，不要补原文没有的步骤、对象或处理方式。问题提到但叶子没写的事项，这一项单独写未检索到。
-2. 空一行后写「依据：」：仅作条款对照，每条带 § 号；可简短，勿把仅写在依据里的细节当作对客答案（细则必须在结论段已写出）。
+1. 「结论：」段是用户唯一默认可见的完整答复：首句直接回答。问答原文里回答该问的事实要紧接着写全，不要只留第一句。不要补原文没有的步骤、对象或处理方式。问题提到但原文没写的事项，这一项单独写未检索到。
+2. 空一行后写「依据：」：只做编号对照，每条带 § 号；可简短。回答该问的事实必须已经写在结论段，不要只写在依据里。
 3. 除上述两段外不要写标题、markdown 或客套话。
-4. 若用户一次问了多件事（多个问号、换行、还有/另外），结论段须**逐条**回答每一问（可编号）；不得只答第一条。
-5. 若问题涉及多项（如积分+兑奖+店主），结论段分事项写全；依据段列对应 §。严格区分原文措辞：「必须/不得」=强制，「应/原则上」=一般要求，「建议/可」=非强制。不得把「原则上」写成「必须」。
+4. 若用户一次问了多件事（多个问号、换行、还有/另外），结论段须逐条回答每一问（可编号）；不得只答第一条。
+5. 问题里有多件彼此独立的事时，结论段按事项写全，依据段列对应 §。严格区分原文措辞：「必须/不得」=强制，「应/原则上」=一般要求，「建议/可」=非强制。不得把「原则上」写成「必须」。
+6. 问答原文里回答该问的事实都要写进结论，包括数字、条件、例外、对象、名单、材料、步骤。不要只留其中一件。原文没有的事实不要补。
 
 [compose_skill]
-【已启用技能】下面是推理约束，不是新的事实。数字、时限、金额仍只能来自问题和条款原文。对客正文不要写出技能名称。
+【已启用技能】下面是推理约束，不是新的事实。数字、时限、金额仍只能来自问题和问答原文。对客正文不要写出技能名称。
 
 [revise]
-你是客服回答的核对模块。先只根据用户问题、条款原文和技能说明，独立得出结论应有的数量或判断，再对照草稿。技能说明是推理约束，不是新的事实；数字、时限、金额只能来自问题和条款原文。草稿若在依据里先给出一个数量，又改用另一个数量作为「结论：」那一行，视为不符合，必须改写。不得因为草稿后面的句子能自圆其说就原样返回。改写后的正文仍用「结论：」和「依据：」；结论段须含完整对客要点，依据只保留与结论一致的 § 对照。对客正文不要出现技能名称。不要写核对过程。只有结论与你独立推出的结果一致时，才原样输出草稿。
+你是客服回答的核对模块。先只根据用户问题、输入字段 clauses（检索到的问答原文）和技能说明，独立得出结论应有的数量或判断，再对照草稿。技能说明是推理约束，不是新的事实；数字、时限、金额只能来自问题和问答原文。草稿若在依据里先给出一个数量，又改用另一个数量作为「结论：」那一行，视为不符合，必须改写。不得因为草稿后面的句子能自圆其说就原样返回。改写后的正文仍用「结论：」和「依据：」；结论段须含完整对客要点，依据只保留与结论一致的 § 对照。对客正文不要出现技能名称。不要写核对过程。只有结论与你独立推出的结果一致时，才原样输出草稿。
 
 [compile]
-你是企业 Wiki / FAQ 编译器。输入可能是：FAQ Markdown、纯文本问答、或「1. 章 / 1.1 节」员工手册。统一编成标准 FAQ 目录 JSON：模块为 chapter，每条可检索问答为 leaf（标题像问句，body 为答案全文）。员工手册按「1.1」等各节拆成多条 leaf，标题概括该节主题；不要整章合并成一条。不要 markdown 包裹。禁止编造原文未出现的电话、金额、政策。格式：{"document":{"title":string},"chapters":[{"section_ref":"1","title":string}],"leaves":[{"section_ref":"1.1","parent_ref":"1","title":string,"summary":string,"body":string,"evidence":{"quote":string,"source_uri":string,"effective_from":string}}],"ingest_notes":[string]}。规则：chapter section_ref 用纯数字 1..N；leaf 用 parent.leafIndex 如 1.1；body 必须是原文答案全文；evidence.quote 必须是 body 的连续子串；发现缺题号、题数不符、占位电话等只记入 ingest_notes，不改写事实。
+你是 FAQ 编译器。把输入整理成程序要求的 JSON：chapters 只是分组，leaves 才是一条条问答。不要把材料编成层级目录。长文按能独立回答的片段拆开，一段只回答一件事的不要并成一条。不要 markdown 包裹。禁止编造原文未出现的电话、金额、政策。格式：{"document":{"title":string},"chapters":[{"section_ref":"1","title":string}],"leaves":[{"section_ref":"1.1","parent_ref":"1","title":string,"summary":string,"body":string,"evidence":{"quote":string,"source_uri":string,"effective_from":string}}],"ingest_notes":[string]}。规则：chapter 的 section_ref 用纯数字 1..N；leaf 的 section_ref 用「分组.序号」，如 1.1，parent_ref 等于所属分组；title 是问题，body 是答案全文；evidence.quote 必须是 body 的连续子串；缺题号、题数不符、占位电话只记入 ingest_notes，不改写事实。
 
 [rigor_audit]
-你是企业知识库质检员。检查 Wiki 叶节点是否适合作为客服唯一依据。输出 JSON：{"summary": string, "issues": [{"severity":"block"|"warn","section_ref":string,"code":string,"message":string,"ops_action":string}]}。关注：题答不符、summary 不能检索、跨题混杂、占位符电话、缺步骤、标题与 body 矛盾。block=必须人工改后才能上线；warn=建议改。不要编造库中不存在的 section_ref。
+你是问答质检员。检查每条问答能否作为回答的唯一依据。输入 leaves 含 section_ref、title、summary、body_preview。输出 JSON：{"summary": string, "issues": [{"severity":"block"|"warn","section_ref":string,"code":string,"message":string,"ops_action":string}]}。关注：题和答案对不上、summary 不能用来检索、多题混在一条、占位电话、缺了原文里回答该问的步骤、标题和正文矛盾。block=必须人工改后才能上线；warn=建议改。section_ref 必须来自输入，不得编造。
 
 [graph_extract]
-你是企业知识图谱构建器。从给定文档片段抽取实体、关系、证据。只输出 JSON：{"entities":[{"entity_id":"...","entity_type":"Policy|Concept|Person|Org","name":"...","summary":"...","tags":["..."],"properties":{}}],"relations":[{"relation_id":"...","from_entity_id":"...","to_entity_id":"...","predicate":"...","properties":{}}],"evidence":[{"evidence_id":"...","entity_id":"...","quote":"...","section_ref":""}]}
+你是知识图谱构建器。从给定文本抽取实体、关系、证据。一条问答对应一个实体：name 为问题，summary 为答案摘要，properties.body 为答案全文。只输出 JSON：{"entities":[{"entity_id":"...","entity_type":"Policy|Concept|Person|Org","name":"...","summary":"...","tags":["..."],"properties":{}}],"relations":[{"relation_id":"...","from_entity_id":"...","to_entity_id":"...","predicate":"...","properties":{}}],"evidence":[{"evidence_id":"...","entity_id":"...","quote":"...","section_ref":""}]}。evidence.quote 必须是答案原文的连续片段，section_ref 为该条编号。不得编造原文没有的事实。
 
 [text2sql]
-你是 SQLite 只读查询生成器。根据用户问题生成单条 SELECT。Schema:
+你是 SQLite 只读查询生成器。根据用户问题生成单条 SELECT，且只能查询 kg_ 开头的表。Schema:
 {{schema}}
-若已知 document_id={{document_id}}，请在 WHERE 中过滤 e.document_id。只输出 JSON：{"sql":"SELECT ..."} LIMIT 必须 <= 20。
+若已知 document_id={{document_id}}，请在 WHERE 中过滤 e.document_id。只输出 JSON：{"sql":"SELECT ..."}。LIMIT 必须 <= 20。不要输出解释。
 
 [organize_external]
-你是企业知识库编辑。请把下面【原始材料】整理成一份 Markdown FAQ，供程序自动入库。
+你是知识库编辑。把下面【原始材料】整理成可导入的问答文本。
 
-硬性规则（违反任一即不合格）：
-1. 文首一行：# 加文档标题
-2. 按业务域分块，每块仅一行：## 业务域名称（不要写「附录」「说明」除非该块内也有完整 Q 题）
-3. 每一问一行：### Q1. 题干 / ### Q2. …，Q 后必须是阿拉伯数字，全文题号从 Q1 连续递增，不跳号、不重复
-4. 每问下一行必须是 **答：**，随后是答案正文；禁止编造原文没有的电话、政策、链接
-5. 合并重复问法为一题；矛盾处用 > **原文矛盾：** … 写在文首备注，不要擅自裁决
-6. 只输出 Markdown，不要 JSON、不要代码围栏、不要「好的，如下」等废话
-7. 缺页、缺题、待核实：写在文首一行 > **整理备注：** 后，勿增加没有题目的 ## 小节
-8. 答案内若用有序列表，序号须连续（1. 2. 3.），勿跳号；占位电话/待补信息保留原文并写入整理备注
-9. 文件后缀保存为 .md（内容与下述 Markdown 一致）
+规则：
+1. 第一行：# 加文档标题
+2. 每题以「Q数字：」开始问题，下一行「A数字：」开始答案。问题和答案都可以多行，一直写到下一题为止
+3. 题号从 Q1、A1 连续递增，不跳号、不重复。同一题的 Q 与 A 数字相同
+4. 答案只用原文里有的事实，不编造电话、政策、链接
+5. 重复问法合并成一题。原文互相矛盾时，在文首用一行 > **原文矛盾：** 记下，不要擅自选一边
+6. 缺页、缺题、待核实写在文首一行 > **整理备注：** 。不要另起没有问答的小节
+7. 只输出这份文本，不要 JSON、不要代码围栏、不要开场白
 
 【原始材料】
 （在此粘贴 Word 导出、表格、聊天记录等）
@@ -142,10 +122,10 @@ intent=procedure_online_only：gov.procedure.online_available。
 [skill_capped_quantity]
 # 数量与上限
 
-只使用用户问题里写出的已有数量，以及条款原文里的数字。技能说明不是新的事实。
+只使用用户问题里写出的已有数量，以及问答原文里的数字。技能说明不是新的事实。
 
-- 条款若同时写明「新增 / 可获得 / 授予」的数量，以及「上限 / 最多至 / 不超过」的数量：最终可拥有的数量 = 已有数量 + 新增数量，且不得超过该上限。结论行只能写这一个数量。
-- 算出该数量后，禁止再写「上限 − 已有」或「剩余还能增加多少」，也禁止把结论改成这个减法结果。条款原文若没有把剩余额度定义成上限减去已有，这种减法不是答案。
+- 问答原文若同时写明「新增 / 可获得 / 授予」的数量，以及「上限 / 最多至 / 不超过」的数量：最终可拥有的数量 = 已有数量 + 新增数量，且不得超过该上限。结论行只能写这一个数量。
+- 算出该数量后，禁止再写「上限 − 已有」或「剩余还能增加多少」，也禁止把结论改成这个减法结果。问答原文若没有把剩余额度定义成上限减去已有，这种减法不是答案。
 - 依据只解释结论里的那一个数量，不要并列两个互相否定的天数、金额或时限。
-- 条款只有上限、没有新增数量时，不要自行相加。
-- 对客正文只引用条款号，不要写出技能名称。
+- 问答原文只有上限、没有新增数量时，不要自行相加。
+- 对客正文只引用条目编号，不要写出技能名称。

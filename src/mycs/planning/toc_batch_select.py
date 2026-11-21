@@ -127,38 +127,10 @@ def run_toc_batch_chapter_select(
         result.batch_log.append(batch_record)
         log_step(logger, "toc_batch_llm_reply", **batch_record)
 
-        if action in ("need_full_handbook", "full", "all"):
-            selected_refs = [str(c.get("section_ref") or "") for c in chapters if c.get("section_ref")]
-            result.selected_section_refs = selected_refs
-            result.reason = "llm_requested_full_handbook"
-            return result
-
         for ref in refs:
-            if ref not in selected_set:
+            if ref not in selected_set and ref in {str(c.get("section_ref") or "") for c in batch}:
                 selected_set.add(ref)
                 selected_refs.append(ref)
-
-        if action in ("done", "stop"):
-            if batches_remaining > 0:
-                log_step(
-                    logger,
-                    "toc_batch_ignore_early_done",
-                    batch_index=batch_idx + 1,
-                    batches_remaining=batches_remaining,
-                    composite=composite,
-                    reason=reason,
-                )
-            else:
-                result.selected_section_refs = selected_refs
-                result.reason = reason or "done"
-                return result
-
-        if action in ("pick", "select") and refs and batches_remaining == 0:
-            result.selected_section_refs = selected_refs
-            result.reason = reason or "last_batch"
-            return result
-
-        # continue / next_batch: proceed to next batch
 
     result.selected_section_refs = selected_refs
     if composite and len(selected_refs) < 2:

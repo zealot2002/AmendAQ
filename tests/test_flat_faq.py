@@ -143,3 +143,42 @@ def test_flat_faq_single_pass_under_max(monkeypatch):
     assert _CountingPickLLM.calls == 1
     assert len(flat.trace_events) == 1
     assert flat.reason == "flat_faq_done"
+
+
+def test_flat_faq_done_does_not_skip_later_slices(monkeypatch):
+    monkeypatch.setenv("MYCS_FAQ_SINGLE_PASS_MAX", "8")
+    monkeypatch.setenv("MYCS_TOC_BATCH_SIZE", "4")
+    monkeypatch.setenv("MYCS_FAQ_RECALL_MAX_PICKS", "5")
+
+    class _Svc(_FakeLeavesSvc):
+        def faq_list_published_leaves(self, *, document_id: str) -> dict[str, Any]:
+            return {
+                "leaves": [
+                    {
+                        "section_ref": f"1.{i}",
+                        "title": f"条目{i}",
+                        "summary": "",
+                        "node_id": f"n{i}",
+                    }
+                    for i in range(1, 10)
+                ]
+            }
+
+    class _DoneThenPick:
+        calls = 0
+
+        def review_faq_title_batch(self, **kwargs: Any) -> dict[str, Any]:
+            _DoneThenPick.calls += 1
+            batch = kwargs["entries_in_batch"]
+            if _DoneThenPick.calls == 1:
+                return {"action": "done", "section_refs": [str(batch[0]["section_ref"])], "reason": "stop"}
+            return {"section_refs": [str(batch[0]["section_ref"])], "reason": "later"}
+
+    flat = run_flat_faq_recall(
+        llm=_DoneThenPick(),
+        svc=_Svc(),  # type: ignore[arg-type]
+        document_id="faq",
+        question="任意",
+    )
+    assert _DoneThenPick.calls == 3
+    assert flat.leaf_section_refs == ["1.1", "1.5", "1.9"]

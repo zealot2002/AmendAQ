@@ -116,32 +116,6 @@ def _forced_batch_chapter_select(
                 rejected=raw_refs,
                 offered=sorted(batch_ref_set),
             )
-        if action in ("need_full_handbook", "full", "all"):
-            refs = [str(c.get("section_ref") or "") for c in chapters if c.get("section_ref")]
-            selected_refs = refs
-            batch_log.append(
-                {
-                    "phase": "L1_chapter",
-                    "batch_index": batch_idx + 1,
-                    "action": action,
-                    "section_refs": refs,
-                    "forced_full_handbook": True,
-                    "llm_calls": take_llm_captures(),
-                }
-            )
-            return selected_refs, batch_log
-
-        if action in ("done", "stop") and batches_remaining > 0:
-            log_step(
-                logger,
-                "comprehensive_toc_force_continue",
-                phase="L1",
-                batch_index=batch_idx + 1,
-                batches_remaining=batches_remaining,
-                ignored_action=action,
-            )
-            action = "continue"
-
         for ref in refs:
             if ref not in selected_set:
                 selected_set.add(ref)
@@ -218,17 +192,6 @@ def _forced_batch_children_select(
                 batch_index=batch_idx + 1,
                 rejected=raw_refs,
             )
-
-        if action in ("done", "stop") and batches_remaining > 0:
-            log_step(
-                logger,
-                "comprehensive_toc_force_continue",
-                phase="L2+",
-                parent=parent_ref,
-                batch_index=batch_idx + 1,
-                ignored_action=action,
-            )
-            action = "continue"
 
         for ref in refs:
             node = _node_by_ref(children, ref) or _node_by_ref(batch, ref)

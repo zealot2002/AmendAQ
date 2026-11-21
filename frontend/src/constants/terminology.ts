@@ -121,8 +121,15 @@ export const T = {
   faqStatusLive: "已上线",
   batchImportTitle: "批量导入问答",
   batchImportHint:
-    "支持：① `1. Q：题干` 下一行 `A：答案`（可多题连续）；② 规范 Markdown `### Q1.` + `**答：**`；③「问：」「答：」成对文本。导入为草稿，需点「正式发布」。",
-  batchImportPlaceholder: "粘贴 .md / .txt 内容…",
+    "Q数字：开始问题，A数字：开始答案。问题和答案都可以写多行，一直写到下一题为止。导入后是草稿，需要点「正式发布」。",
+  batchImportExample: `Q1：怎么修改登录密码？
+A1：打开「设置 - 账号安全」。
+按短信验证后设置新密码。
+新密码需包含字母和数字。
+
+Q2：忘记密码怎么办？
+A2：在登录页点「忘记密码」，用绑定手机号重置。`,
+  batchImportPlaceholder: "按上方示例粘贴，可连续多题",
   confirmDeleteLibrary: "确定删除该知识库及全部问答？不可恢复。",
   confirmDeleteFaq: "确定删除该条问答？",
   msgLibraryCreated: "知识库已创建",

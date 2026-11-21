@@ -323,7 +323,7 @@ class KbService:
         parsed = parse_faq_import_text(text, default_title=lib["title"])
         if not parsed:
             raise ValueError(
-                "未能解析任何问答。请使用规范 Markdown（### Q1. … + **答：**）或「问：」「答：」成对文本。"
+                "未能解析任何问答。请按「Q1：问题」下一行「A1：答案」粘贴。"
             )
         return self._insert_parsed_rows(
             document_id, parsed, status="draft" if as_draft else "published"

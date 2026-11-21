@@ -24,16 +24,23 @@ def _strip_q_prefix(title: str) -> str:
 
 def parse_faq_import_text(text: str, *, default_title: str = "导入 FAQ") -> list[ParsedFaqRow]:
     """
-    规范 Markdown：### Qn. 题干 + **答：** 答案。
-    宽松 txt：`1. Q：…` + `A：…`、或「问：」「答：」成对文本。
+    标准：`Q1：问题` 下一行 `A1：答案`，可连续多题。
+    仍兼容旧稿：### Qn + **答：**、`1. Q：`、以及「问：」「答：」。
     """
     raw = (text or "").strip()
     if not raw:
         return []
 
+    paired = _parse_qna_pairs(raw)
+    if paired:
+        return paired
+
     if QUESTION_LINE.search(raw) or raw.lstrip().startswith("#"):
-        if not raw.lstrip().startswith("#"):
-            raw = f"# {default_title}\n\n## 导入\n\n{raw}"
+        # 「### Q1」也以 # 开头，不能据此判断已经有标题。没有章节时补一章，否则解析结果为空。
+        if not re.search(r"(?m)^##\s+\S", raw):
+            raw = f"## 导入\n\n{raw}"
+        if not re.search(r"(?m)^#\s+\S", raw):
+            raw = f"# {default_title}\n\n{raw}"
         draft = compile_faq_markdown_rules(raw, source_uri="import://batch")
         rows: list[ParsedFaqRow] = []
         for leaf in draft.leaves:
@@ -55,6 +62,57 @@ def parse_faq_import_text(text: str, *, default_title: str = "导入 FAQ") -> li
     if numbered:
         return numbered
     return _parse_qa_blocks_loose(raw)
+
+
+_QN_LINE = re.compile(r"^Q\s*(\d+)\s*[：:]\s*(.*)$", re.IGNORECASE)
+_AN_LINE = re.compile(r"^A\s*(\d+)\s*[：:]\s*(.*)$", re.IGNORECASE)
+
+
+def _parse_qna_pairs(text: str) -> list[ParsedFaqRow]:
+    """Q1：问题 / A1：答案。问题和答案都可以续行，直到下一个 Q 或 A。"""
+    if not re.search(r"(?im)^Q\s*\d+\s*[：:]", text):
+        return []
+    rows: list[ParsedFaqRow] = []
+    question_parts: list[str] = []
+    answer_parts: list[str] = []
+    in_answer = False
+
+    def flush() -> None:
+        nonlocal question_parts, answer_parts, in_answer
+        question = "\n".join(question_parts).strip()
+        answer = "\n".join(answer_parts).strip()
+        if question and answer:
+            rows.append(ParsedFaqRow(question=question, answer=answer))
+        question_parts = []
+        answer_parts = []
+        in_answer = False
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        question_line = _QN_LINE.match(line)
+        if question_line:
+            flush()
+            if question_line.group(2).strip():
+                question_parts.append(question_line.group(2).strip())
+            continue
+        answer_line = _AN_LINE.match(line)
+        if answer_line and question_parts:
+            in_answer = True
+            if answer_line.group(2).strip():
+                answer_parts.append(answer_line.group(2).strip())
+            continue
+        if not line:
+            if in_answer and answer_parts:
+                answer_parts.append("")
+            elif question_parts:
+                question_parts.append("")
+            continue
+        if in_answer:
+            answer_parts.append(line)
+        elif question_parts:
+            question_parts.append(line)
+    flush()
+    return rows
 
 
 _Q_LINE = re.compile(

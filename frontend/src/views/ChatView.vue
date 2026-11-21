@@ -21,7 +21,7 @@
                 </div>
               </div>
             </div>
-            <el-empty v-if="!messages.length" :description="T.chatEmpty">
+            <el-empty v-if="showSetupEmpty" :description="T.chatEmpty">
               <el-button type="primary" @click="goLibrary">{{ T.chatGoLibrary }}</el-button>
             </el-empty>
           </div>
@@ -136,12 +136,12 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { CircleCheck, Loading } from "@element-plus/icons-vue";
 import { T } from "@/constants/terminology";
-import { chatStream, type ChatTraceEvent } from "@/api/client";
+import { chatStream, fetchLibraries, type ChatTraceEvent } from "@/api/client";
 import { useDocumentId } from "@/composables/useDocumentId";
 
 const router = useRouter();
@@ -157,6 +157,23 @@ const loading = ref(false);
 const messages = ref<
   { role: "user" | "assistant"; content: string; pending?: boolean; elapsedSeconds?: number }[]
 >([]);
+const hasLibrary = ref(Boolean(documentId.value.trim()));
+const libraryChecked = ref(hasLibrary.value);
+const showSetupEmpty = computed(
+  () => !messages.value.length && libraryChecked.value && !hasLibrary.value,
+);
+
+onMounted(async () => {
+  try {
+    const data = await fetchLibraries();
+    const count = data.count ?? data.libraries?.length ?? 0;
+    hasLibrary.value = count > 0 || Boolean(documentId.value.trim());
+  } catch {
+    hasLibrary.value = Boolean(documentId.value.trim());
+  } finally {
+    libraryChecked.value = true;
+  }
+});
 
 function formatElapsed(v: number) {
   return Number.isInteger(v) ? String(v) : v.toFixed(1);

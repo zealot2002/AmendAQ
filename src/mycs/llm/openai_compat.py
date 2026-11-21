@@ -149,22 +149,16 @@ class OpenAICompatLLM:
         enumerative_note = (
             "\n\n" + prompt("toc_catalog_enumerative") if enumerative_query else ""
         )
+        _ = (chapter_total, batch_total, already_selected, batches_remaining)
         system = prompt(
             "toc_catalog",
-            chapter_total=chapter_total,
-            batch_total=batch_total,
             composite_note=composite_note,
             enumerative_note=enumerative_note,
         )
         user = json.dumps(
             {
                 "question": question,
-                "batch_index": batch_index,
-                "batch_total": batch_total,
-                "chapter_total": chapter_total,
-                "batches_remaining_after_this": batches_remaining,
-                "already_selected_chapters": already_selected,
-                "chapters_in_this_batch": chapters_in_batch,
+                "chapters": chapters_in_batch,
                 "composite_query": composite_query,
                 "enumerative_query": enumerative_query,
             },
@@ -172,18 +166,16 @@ class OpenAICompatLLM:
         )
         try:
             data = self._json_chat(system, user, max_tokens=768)
-            action = str(data.get("action") or "continue").lower()
             refs = data.get("section_refs") or []
             if not isinstance(refs, list):
                 refs = []
             return {
-                "action": action,
                 "section_refs": [str(r) for r in refs if r],
                 "reason": str(data.get("reason") or ""),
             }
         except Exception as exc:
             logger.error("llm toc batch review failed batch=%s: %s", batch_index, exc)
-            return {"action": "continue", "section_refs": [], "reason": str(exc)}
+            return {"section_refs": [], "reason": str(exc)}
 
     def review_toc_children_batch(
         self,
@@ -210,16 +202,11 @@ class OpenAICompatLLM:
             enumerative_note=enumerative_note,
             composite_note=composite_note,
         )
+        _ = (batch_total, batches_remaining, already_selected, parent_title)
         user = json.dumps(
             {
                 "question": question,
-                "parent_section_ref": parent_section_ref,
-                "parent_title": parent_title,
-                "batch_index": batch_index,
-                "batch_total": batch_total,
-                "batches_remaining_after_this": batches_remaining,
-                "already_selected": already_selected,
-                "children_in_this_batch": children_in_batch,
+                "entries": children_in_batch,
                 "enumerative_query": enumerative_query,
                 "composite_query": composite_query,
             },
@@ -227,14 +214,10 @@ class OpenAICompatLLM:
         )
         try:
             data = self._json_chat(system, user, max_tokens=768)
-            action = str(data.get("action") or "continue").lower()
-            if action in ("done", "stop") and batches_remaining > 0:
-                action = "continue"
             refs = data.get("section_refs") or []
             if not isinstance(refs, list):
                 refs = []
             return {
-                "action": action,
                 "section_refs": [str(r) for r in refs if r],
                 "reason": str(data.get("reason") or ""),
             }
@@ -271,15 +254,9 @@ class OpenAICompatLLM:
         composite_note = (
             "\n\n" + prompt("faq_title_composite", pick_cap=pick_cap) if composite_query else ""
         )
-        if batch_total <= 1:
-            flow_note = prompt("faq_title_flow_single", pick_cap=pick_cap)
-        elif recall_exhaustive_batches:
-            flow_note = prompt("faq_title_flow_exhaustive")
-        else:
-            flow_note = prompt("faq_title_flow_partial")
+        _ = (batches_remaining, already_selected, recall_exhaustive_batches)
         system = prompt(
             "faq_title",
-            flow_note=flow_note,
             enumerative_note=enumerative_note,
             composite_note=composite_note,
         )
@@ -287,12 +264,7 @@ class OpenAICompatLLM:
             {
                 "question": question,
                 "document_title": document_title,
-                "batch_index": batch_index,
-                "batch_total": batch_total,
-                "entry_total": entry_total,
-                "batches_remaining_after_this": batches_remaining,
-                "already_selected": already_selected,
-                "entries_in_this_batch": entries_in_batch,
+                "entries": entries_in_batch,
                 "enumerative_query": enumerative_query,
                 "composite_query": composite_query,
                 "max_picks": pick_cap,
@@ -302,14 +274,10 @@ class OpenAICompatLLM:
         try:
             token_cap = 2048 if batch_total <= 1 and entry_total > 24 else 768
             data = self._json_chat(system, user, max_tokens=token_cap)
-            action = str(data.get("action") or "continue").lower()
-            if recall_exhaustive_batches and action in ("done", "stop") and batches_remaining > 0:
-                action = "continue"
             refs = data.get("section_refs") or []
             if not isinstance(refs, list):
                 refs = []
             return {
-                "action": action,
                 "section_refs": [str(r) for r in refs if r],
                 "reason": str(data.get("reason") or ""),
             }

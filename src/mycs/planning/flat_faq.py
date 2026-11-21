@@ -103,14 +103,6 @@ def _trim_faq_picks(
     return kept, dropped
 
 
-def _faq_recall_exhaustive() -> bool:
-    return os.environ.get("MYCS_FAQ_RECALL_ALL_BATCHES", "0").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    )
-
-
 def _faq_effective_batch_size(leaf_count: int) -> int:
     if leaf_count <= _faq_single_pass_max():
         return leaf_count
@@ -137,7 +129,6 @@ def _forced_batch_faq_title_select(
         return [], [], 0
     pick_cap = _recall_max_picks(enumerative_query=enumerative_query)
     batch_size = _faq_effective_batch_size(len(leaves))
-    exhaustive = _faq_recall_exhaustive()
     batches = [leaves[i : i + batch_size] for i in range(0, len(leaves), batch_size)]
     log_step(
         logger,
@@ -146,7 +137,6 @@ def _forced_batch_faq_title_select(
         batch_size=batch_size,
         batch_total=len(batches),
         single_pass=len(batches) == 1,
-        exhaustive_batches=exhaustive,
     )
     picked_nodes: list[dict[str, Any]] = []
     picked_ids: set[str] = set()
@@ -172,7 +162,6 @@ def _forced_batch_faq_title_select(
             batches_remaining=batches_remaining,
             enumerative_query=enumerative_query,
             composite_query=composite_query,
-            recall_exhaustive_batches=exhaustive,
             max_picks=pick_cap,
         )
         action = str(decision.get("action") or "continue").lower()
@@ -186,24 +175,6 @@ def _forced_batch_faq_title_select(
                 batch_index=batch_idx + 1,
                 rejected=raw_refs,
             )
-
-        if action in ("done", "stop") and batches_remaining > 0:
-            if exhaustive:
-                log_step(
-                    logger,
-                    "flat_faq_force_continue",
-                    batch_index=batch_idx + 1,
-                    ignored_action=action,
-                )
-                action = "continue"
-            else:
-                log_step(
-                    logger,
-                    "flat_faq_early_stop",
-                    batch_index=batch_idx + 1,
-                    action=action,
-                    batches_skipped=batches_remaining,
-                )
 
         for ref in refs:
             node = _node_by_ref(leaves, ref) or _node_by_ref(batch, ref)
@@ -226,18 +197,6 @@ def _forced_batch_faq_title_select(
                 "llm_calls": take_llm_captures(),
             }
         )
-
-        if action in ("done", "stop") and batches_remaining > 0 and not exhaustive:
-            break
-
-        if len(picked_nodes) >= pick_cap:
-            log_step(
-                logger,
-                "flat_faq_pick_cap_reached",
-                cap=pick_cap,
-                picked=len(picked_nodes),
-            )
-            break
 
     trimmed, dropped = _trim_faq_picks(
         question,

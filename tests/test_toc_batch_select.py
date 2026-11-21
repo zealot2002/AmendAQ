@@ -46,4 +46,4 @@ def test_batch_select_continue_then_pick(monkeypatch):
     assert res.selected_section_refs == ["5.", "6."]
     assert res.batches_shown == 3
     assert len(res.batch_log) == 3
-    assert res.reason == "enough"
+    assert res.reason == "exhausted_batches"

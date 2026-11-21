@@ -22,8 +22,8 @@ def test_prompt_file_has_every_section():
 
 
 def test_prompt_fills_placeholders():
-    text = prompt("faq_title_flow_single", pick_cap=5)
-    assert "max_picks=5" in text
+    text = prompt("faq_title_ordinary", pick_cap=5)
+    assert "硬性上限 5 条" in text
     assert "{{" not in text
 
 
