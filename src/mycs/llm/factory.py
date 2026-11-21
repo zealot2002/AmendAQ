@@ -26,7 +26,7 @@ def create_llm(backend: str | None = None) -> AgentLLM:
         else:
             name = "ollama"
 
-    # 有智谱 Key 时不回落到 ~/.zshrc 里的 openai/Qwen 网关
+    # 只有没写明用 ollama 时，才避免落到 ~/.zshrc 里的 openai/Qwen 网关
     if name in ("openai", "vllm", "compat") and _glm_api_key():
         if os.environ.get("MYCS_LLM_FORCE_OPENAI", "").strip().lower() not in (
             "1",
@@ -92,11 +92,13 @@ def create_llm(backend: str | None = None) -> AgentLLM:
         )
 
     if name == "ollama":
-        logger.info("joyjoy: using Ollama")
+        base = _ollama_base_url()
+        model = os.environ.get("OLLAMA_MODEL") or "qwen2.5:7b"
+        logger.info("joyjoy: using Ollama model=%s base=%s", model, base)
         return OpenAICompatLLM(
-            base_url=os.environ.get("OPENAI_API_BASE", "http://localhost:11434/v1"),
-            api_key=os.environ.get("OPENAI_API_KEY", "ollama"),
-            model=os.environ.get("OPENAI_MODEL", "qwen2.5:7b"),
+            base_url=base,
+            api_key=os.environ.get("OLLAMA_API_KEY") or "ollama",
+            model=model,
             provider="ollama",
             trust_env=False,
         )
@@ -144,5 +146,16 @@ def resolve_llm_model_name(backend: str | None = None) -> str:
     if name in ("openai", "vllm", "compat"):
         return os.environ.get("OPENAI_MODEL") or "openai-compat"
     if name == "ollama":
-        return os.environ.get("OPENAI_MODEL") or "qwen2.5:7b"
+        return os.environ.get("OLLAMA_MODEL") or "qwen2.5:7b"
     return "大模型"
+
+
+def _ollama_base_url() -> str:
+    raw = (
+        os.environ.get("OLLAMA_BASE_URL")
+        or os.environ.get("OLLAMA_HOST")
+        or "http://127.0.0.1:11434"
+    ).strip().rstrip("/")
+    if raw.endswith("/v1"):
+        return raw
+    return raw + "/v1"
