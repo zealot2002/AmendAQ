@@ -1,5 +1,11 @@
 #!/usr/bin/env -S uv run python
-"""Run 10 Xinghe handbook questions; write JSON + markdown report."""
+"""Run 10 Xinghe handbook questions; write JSON + markdown report.
+
+NOTE: This script is NOT reproducible in the current repo. It expects
+`docs/星河科技_中文员工手册_知识库测试.txt`, which is missing, and it hard-codes
+local paths. Use `examples/eval/run_eval.py` for the bundled, runnable demo
+evaluation instead.
+"""
 from __future__ import annotations
 
 import json
