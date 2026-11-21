@@ -89,13 +89,17 @@ def _parse_skill(path: Path) -> AnswerSkill:
     meta, body = _split_frontmatter(text)
     question_any = tuple(_as_list(meta.get("question_any")))
     evidence_any = tuple(_as_list(meta.get("evidence_any")))
+    name = str(meta.get("name") or path.parent.name).strip()
+    from mycs.prompts import prompt_if
+
+    instructions = prompt_if("skill_" + name.replace("-", "_")) or body.strip()
     return AnswerSkill(
-        name=str(meta.get("name") or path.parent.name).strip(),
+        name=name,
         description=str(meta.get("description") or "").strip(),
         question_any=question_any,
         evidence_any=evidence_any,
         revise=_as_bool(meta.get("revise")),
-        instructions=body.strip(),
+        instructions=instructions,
         path=str(path),
     )
 

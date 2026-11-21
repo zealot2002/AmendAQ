@@ -9,21 +9,16 @@ from typing import Any, Protocol
 from mycs.graph.model import GraphEntity, GraphEvidence, GraphRelation, KnowledgeGraph
 from mycs.log import get_logger
 from mycs.log_detail import log_step
+from mycs.prompts import prompt
 from mycs.wiki.ingest import policies_from_text
 
 logger = get_logger(__name__)
 
 DEFAULT_EXTRACT_CHUNK_SIZE = 6000
 
-EXTRACT_SYSTEM = (
-    "你是企业知识图谱构建器。从给定文档片段抽取实体、关系、证据。"
-    "只输出 JSON："
-    '{"entities":[{"entity_id":"...","entity_type":"Policy|Concept|Person|Org",'
-    '"name":"...","summary":"...","tags":["..."],"properties":{}}],'
-    '"relations":[{"relation_id":"...","from_entity_id":"...","to_entity_id":"...",'
-    '"predicate":"...","properties":{}}],'
-    '"evidence":[{"evidence_id":"...","entity_id":"...","quote":"...","section_ref":""}]}'
-)
+
+def extract_system() -> str:
+    return prompt("graph_extract")
 
 
 class GraphExtractor(Protocol):
@@ -276,7 +271,7 @@ class OllamaGraphExtractor:
                     chunk_index=idx,
                     user_chars=len(user),
                 )
-                data = self._llm._json_chat(EXTRACT_SYSTEM, user)  # type: ignore[attr-defined]
+                data = self._llm._json_chat(extract_system(), user)  # type: ignore[attr-defined]
             except Exception as exc:
                 log_step(
                     logger,

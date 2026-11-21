@@ -15,6 +15,7 @@ from mycs.log import get_logger
 from mycs.log_detail import log_step
 from mycs.models import KnowledgeRequirement, UnderstandResult
 from mycs.planning.graph_plan import minimal_graph_fallback
+from mycs.prompts import prompt
 from mycs.planning.plan_schema import normalize_requirements
 from mycs.ui.trace_llm_capture import record_llm_exchange
 
@@ -54,14 +55,7 @@ class OpenAICompatLLM:
         self.provider = provider or _infer_provider(self.base_url)
 
     def understand(self, question: str, case_id: str | None) -> UnderstandResult:
-        system = (
-            "你是客服 Agent 的理解模块。只输出 JSON，不要 markdown。"
-            "字段：case_id (string|null), intent (string), graph_document_id (string|null)。"
-            "intent：case_status_and_policy_limit | procedure_online_only | graph_qa。"
-            "无办件号且问政策/手册/流程 → graph_qa。"
-            "问能否线上办理 → procedure_online_only。"
-            "办件进度/预审/时限 → case_status_and_policy_limit，并提取 CASE-YYYY-NNN。"
-        )
+        system = prompt("understand")
         user = json.dumps({"question": question, "hint_case_id": case_id}, ensure_ascii=False)
         try:
             data = self._json_chat(system, user)
@@ -103,16 +97,7 @@ class OpenAICompatLLM:
         path: list[dict[str, str]],
         choices: list[dict[str, object]],
     ) -> dict[str, Any]:
-        system = (
-            "你是知识库目录导航模块（像查字典一样一层层缩小范围）。只输出 JSON，不要 markdown。"
-            '格式：{"action":"select"|"stop","node_id":string|null,"reason":string}。'
-            "规则："
-            "1) choices 是当前层级并列目录（含 node_id、section_ref、title、kind）；"
-            "2) action=select 时必须给出最相关条目的 node_id；"
-            "3) kind=leaf 表示已到具体条款，选中后停止展开；"
-            "4) action=stop 表示无法判断或需保持上一层范围，node_id 为 null；"
-            "5) 只选一个条目，不要编造 node_id。"
-        )
+        system = prompt("toc_select")
         user = json.dumps(
             {
                 "question": question,
@@ -158,40 +143,18 @@ class OpenAICompatLLM:
         composite_query: bool = False,
         enumerative_query: bool = False,
     ) -> dict[str, Any]:
-        composite_note = ""
-        if composite_query:
-            composite_note = (
-                "\n\n【综合/多事项问题】用户可能在问多个彼此独立的事项（如离职+年假+报销+归还电脑）。"
-                "每一事项可能落在**不同章**；本批命中的章不能代表已覆盖全部。"
-                "必须在本批选出所有可能相关的章；"
-                "section_ref **只能**来自本批 chapters 列表，不得写已选过的其他章号。"
-                f"在 batches_remaining_after_this>0 时**禁止 action=done**，只能用 pick 或 continue。"
-            )
-        enumerative_note = ""
-        if enumerative_query:
-            enumerative_note = (
-                "\n\n【列举/汇总类问题】用户可能要枚举条目（如「有哪些状态」「全部列出」）。"
-                "须看完**所有批次**后在各批挑出**可能相关的章**；"
-                "可用 need_full_handbook 仅当确需通读全手册且你已理解必须覆盖每一章。"
-                "不得在未看完所有批时因怕漏选而 need_full_handbook。"
-            )
-        system = (
-            "你是知识库目录分批浏览助手。手册一级目录（章）很多，系统会**分批**把章列表发给你。"
-            "你的目标是：根据用户问题，找出**可能包含答案的章**，不要漏掉相关章。"
-            "只输出 JSON，不要 markdown。格式："
-            '{"action":"pick"|"continue"|"done"|"need_full_handbook","section_refs":["6.",...],"reason":"..."}。'
-            "\n\n说明："
-            f"- 全手册共 {chapter_total} 章，分 {batch_total} 批展示；"
-            "每批只含部分章，**当前批里没有相关章不代表手册其他章没有**，除非已看完所有批。"
-            "\n\naction 含义："
-            "- pick：本批中有相关章，把 section_ref 写入 section_refs（可多选）；"
-            "若仍需查看后续批次继续找，action 仍用 pick 并只写本批命中的章；"
-            "- continue：本批完全不相关，且还需要看后续批次；"
-            "- done：仅当**已看完所有批**且 already_selected 已覆盖问题的全部事项时才能用；"
-            "- need_full_handbook：问题需要通读全手册（如「所有」「全部」「列举每一个」），不再分批。"
-            "\nsection_ref 必须来自本批 chapters 列表，不得编造。"
-            + composite_note
-            + enumerative_note
+        composite_note = (
+            "\n\n" + prompt("toc_catalog_composite") if composite_query else ""
+        )
+        enumerative_note = (
+            "\n\n" + prompt("toc_catalog_enumerative") if enumerative_query else ""
+        )
+        system = prompt(
+            "toc_catalog",
+            chapter_total=chapter_total,
+            batch_total=batch_total,
+            composite_note=composite_note,
+            enumerative_note=enumerative_note,
         )
         user = json.dumps(
             {
@@ -236,30 +199,16 @@ class OpenAICompatLLM:
         enumerative_query: bool = False,
         composite_query: bool = False,
     ) -> dict[str, Any]:
-        enumerative_note = ""
-        if enumerative_query:
-            enumerative_note = (
-                "\n\n【列举类问题】须在每批中勾选**与用户所问主题直接相关**的叶/节；"
-                "可能需多选才能完成列举，但**禁止**把明显无关条目一律勾上以「兜底」。"
-            )
-        composite_note = ""
-        if composite_query:
-            composite_note = (
-                "\n\n【多道独立小问题】用户可能一次问了多个不相关事项。"
-                "只勾选**直接回答其中某一问**的叶，不要因「同一父章」就整批全选。"
-            )
-        system = (
-            "你是知识库目录的全面浏览助手。用户在父章节下有一批并列子条目（可能是节或具体问答叶）。"
-            "系统会**分批**展示；你必须假设：本批不相关不等于其他批不相关。"
-            "在 batches_remaining_after_this > 0 时**禁止** action=done/stop，只能用 pick 或 continue。"
-            "只输出 JSON："
-            '{"action":"pick"|"continue","section_refs":["9.2",...],"reason":"..."}。'
-            "\n- pick：本批中与用户问题可能相关的条目 section_ref（可多选）；"
-            "- continue：本批全不相关，且后续批次仍需查看。"
-            "\n若本批全部不相关，section_refs 可为空并使用 continue；**禁止**因怕漏答而勾选调明显无关的条目。"
-            "\nsection_ref 必须来自 children_in_batch，不得编造。kind=leaf 为具体条款。"
-            + enumerative_note
-            + composite_note
+        enumerative_note = (
+            "\n\n" + prompt("toc_children_enumerative") if enumerative_query else ""
+        )
+        composite_note = (
+            "\n\n" + prompt("toc_children_composite") if composite_query else ""
+        )
+        system = prompt(
+            "toc_children",
+            enumerative_note=enumerative_note,
+            composite_note=composite_note,
         )
         user = json.dumps(
             {
@@ -315,49 +264,24 @@ class OpenAICompatLLM:
         max_picks: int = 5,
     ) -> dict[str, Any]:
         pick_cap = max(1, int(max_picks))
-        enumerative_note = ""
         if enumerative_query:
-            enumerative_note = (
-                f"\n\n【列举类问题】只勾选与用户所问主题直接相关的 FAQ，"
-                f"最多 {pick_cap} 条；不要勾选明显无关的标题，严禁接近全选。"
-            )
+            enumerative_note = "\n\n" + prompt("faq_title_enumerative", pick_cap=pick_cap)
         else:
-            enumerative_note = (
-                f"\n\n【普通问答】只勾选最能直接回答用户问题的条目，"
-                f"通常 1～3 条，硬性上限 {pick_cap} 条；禁止勾选大批仅「有点相关」的标题。"
-            )
-        composite_note = ""
-        if composite_query:
-            composite_note = (
-                "\n\n【多道独立小问题】只勾选直接回答其中某一问的条目。"
-            )
+            enumerative_note = "\n\n" + prompt("faq_title_ordinary", pick_cap=pick_cap)
+        composite_note = (
+            "\n\n" + prompt("faq_title_composite", pick_cap=pick_cap) if composite_query else ""
+        )
         if batch_total <= 1:
-            flow_note = (
-                "本次已展示本库**全部**问答标题（单批）。"
-                f"请只 pick 最相关的 section_ref（遵守 max_picks={pick_cap}），严禁接近全选。"
-                '可用 action=done 表示已选完。'
-            )
+            flow_note = prompt("faq_title_flow_single", pick_cap=pick_cap)
         elif recall_exhaustive_batches:
-            flow_note = (
-                "系统会分批展示全部问答标题；你须在看完**所有批次**前不要声称已完成。"
-                "在 batches_remaining_after_this > 0 时禁止 action=done/stop，只能用 pick 或 continue。"
-            )
+            flow_note = prompt("faq_title_flow_exhaustive")
         else:
-            flow_note = (
-                "系统会分批展示问答标题。若已足够回答用户问题，可用 action=done/stop 结束，"
-                "后续批次将不再展示；仍不确定时请 continue 或 pick。"
-            )
-        system = (
-            "你是 FAQ 知识库助手。文档是扁平问答列表（每条有 section_ref、title、summary），"
-            "没有章节目录下钻。"
-            + flow_note
-            + "只输出 JSON："
-            '{"action":"pick"|"continue"|"done"|"stop","section_refs":["§9.3",...],"reason":"..."}。'
-            "\n- pick：本批标题/摘要与用户问题可能相关的条目（可多选）；"
-            "- continue：本批全不相关，仍需看后续批次。"
-            "\nsection_ref 必须来自 entries_in_batch，不得编造。"
-            + enumerative_note
-            + composite_note
+            flow_note = prompt("faq_title_flow_partial")
+        system = prompt(
+            "faq_title",
+            flow_note=flow_note,
+            enumerative_note=enumerative_note,
+            composite_note=composite_note,
         )
         user = json.dumps(
             {
@@ -399,29 +323,7 @@ class OpenAICompatLLM:
         plan_context: dict[str, object] | None = None,
     ) -> list[KnowledgeRequirement]:
         plan_context = plan_context or {}
-        system = (
-            "你是 Knowledge Agent 的规划模块。只输出 JSON，不要 markdown："
-            '{"requirements":[{"field":"...","source":"graph|domain_api|wiki","params":{...}}]}。'
-            "规划的是**知识缺口**（Knowledge Requirement），不是 search 关键词列表，不要 tool 字段。"
-            "\n\nintent=graph_qa 时（员工手册/政策 Wiki）："
-            "输入含 wiki_toc_outline（已选相关章下的节/条摘要）、wiki_selected_chapters（章列表）、"
-            "wiki_drill_path（逐层定位路径，可能为空）。"
-            "outline 中的 section_ref 是唯一合法条号来源。"
-            "禁止使用 graph.entity.search。召回已由目录全面遍历完成。"
-            "1) 仅使用 graph.entity.by_section：section 必须来自 wiki_toc_outline 的 leaf section_ref；"
-            "2) 可选 wiki.toc.leaves：params.node_ids 直接取叶子正文；"
-            "3) graph.entity.by_section 的 section 必须来自 wiki_toc_outline 的 leaf section_ref；"
-            "若 wiki_scope_section_refs 含多条，每一条都要单独 by_section，不要只查落下的那一节；"
-            "5) wiki.toc.leaves 可指定 node_ids 直接取叶子；"
-            "6) graph.read.query 仅用于列举/汇总/金额类。"
-            "禁止臆造条号、禁止 neighbors 凑数。"
-            "params.document_id 必须等于 graph_document_id。"
-            "requirements[].field 只能是合法缺口名（如 graph.entity.search），"
-            "不得把 wiki_drill_path、wiki_toc_outline 等输入字段当作 field。"
-            "\n\nintent=case_status_and_policy_limit：case.status、case.record、"
-            "gov.policy.review_time_limit（procedure_id=__from_case__ review_stage=pre_review）。"
-            "\n\nintent=procedure_online_only：gov.procedure.online_available。"
-        )
+        system = prompt("plan")
         outline_raw = plan_context.get("wiki_toc_outline") or []
         user_payload = {
             "intent": understood.intent,
@@ -476,34 +378,10 @@ class OpenAICompatLLM:
         context: dict[str, object],
     ) -> tuple[str, dict[str, object]]:
         claims = build_claims(understood, context)  # type: ignore[arg-type]
-        system = (
-            "你是智能客服。优先根据 tool_results.wiki_leaves 与 graph_entities 作答。"
-            "引用章节号（§x.y）。禁止编造检索结果中不存在的数字、时限、金额。"
-            "仅当 wiki_leaves 与 graph_entities 均为空时，才整句回答「当前知识库未检索到相关条款，请补充或联系管理员」。"
-            "若已检索到实体：必须分事项作答——有依据的事项写清结论；某一事项在实体中无依据时，"
-            "仅对该事项说明未检索到，**不得**因此拒答其他已有依据的事项。"
-            "多章节需综合。只输出中文正文。"
-            "\n\n【回答格式 — 必须遵守】"
-            "\n1. 「结论：」段 = **用户唯一默认可见的完整答复**（不可只写一句话敷衍）："
-            "首句直接回答是/否/可否/数量/时限；随后用编号分条写清步骤、链接、电话、时限、"
-            "操作路径等可操作要点，均须来自 wiki_leaves / graph_entities 原文，禁止编造。"
-            "\n2. 空一行后写「依据：」：仅作条款对照，每条带 § 号；可简短，勿把仅写在依据里的细节"
-            "当作对客答案（细则必须在结论段已写出）。"
-            "\n3. 除上述两段外不要写标题、markdown 或客套话。"
-            "\n4. 若用户一次问了多件事（多个问号、换行、还有/另外），结论段须**逐条**回答每一问（可编号）；"
-            "不得只答第一条。"
-            "\n5. 若问题涉及多项（如积分+兑奖+店主），结论段分事项写全；依据段列对应 §。"
-            "严格区分原文措辞：「必须/不得」=强制，「应/原则上」=一般要求，"
-            "「建议/可」=非强制。不得把「原则上」写成「必须」。"
-        )
+        system = prompt("compose")
         skill_text = str(context.get("skill_instructions") or "").strip()
         if skill_text:
-            system += (
-                "\n\n【已启用技能】下面是推理约束，不是新的事实。"
-                "数字、时限、金额仍只能来自问题和条款原文。"
-                "对客正文不要写出技能名称。\n"
-                + skill_text
-            )
+            system += "\n\n" + prompt("compose_skill") + "\n" + skill_text
         slim = {
             "wiki_leaves": context.get("wiki_leaves"),
             "graph_entities": context.get("graph_entities") or context.get("graph_entity"),
@@ -556,15 +434,7 @@ class OpenAICompatLLM:
         evidence_text: str,
         skill_instructions: str,
     ) -> str:
-        system = (
-            "你是客服回答的核对模块。先只根据用户问题、条款原文和技能说明，独立得出结论应有的数量或判断，再对照草稿。"
-            "技能说明是推理约束，不是新的事实；数字、时限、金额只能来自问题和条款原文。"
-            "草稿若在依据里先给出一个数量，又改用另一个数量作为「结论：」那一行，视为不符合，必须改写。"
-            "不得因为草稿后面的句子能自圆其说就原样返回。"
-            "改写后的正文仍用「结论：」和「依据：」；结论段须含完整对客要点，依据只保留与结论一致的 § 对照。"
-            "对客正文不要出现技能名称。不要写核对过程。"
-            "只有结论与你独立推出的结果一致时，才原样输出草稿。"
-        )
+        system = prompt("revise")
         user = json.dumps(
             {
                 "question": question,

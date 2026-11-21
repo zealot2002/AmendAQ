@@ -225,16 +225,9 @@ def run_llm_rigor_audit(llm: Any, draft: WikiCanonicalDraft) -> tuple[list[Rigor
         }
         for lf in draft.leaves[:80]
     ]
-    system = (
-        "你是企业知识库质检员。检查 Wiki 叶节点是否适合作为客服唯一依据。"
-        "输出 JSON：{"
-        '"summary": string, '
-        '"issues": [{"severity":"block"|"warn","section_ref":string,"code":string,'
-        '"message":string,"ops_action":string}]'
-        "}。"
-        "关注：题答不符、summary 不能检索、跨题混杂、占位符电话、缺步骤、标题与 body 矛盾。"
-        "block=必须人工改后才能上线；warn=建议改。不要编造库中不存在的 section_ref。"
-    )
+    from mycs.prompts import prompt
+
+    system = prompt("rigor_audit")
     user = json.dumps(
         {"document_title": draft.document_title, "leaves": catalog},
         ensure_ascii=False,

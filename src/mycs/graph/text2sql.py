@@ -6,6 +6,7 @@ from typing import Any, Protocol
 
 from mycs.db.schema_kg import KG_SCHEMA_FOR_LLM
 from mycs.log import get_logger
+from mycs.prompts import prompt
 
 logger = get_logger(__name__)
 
@@ -24,11 +25,10 @@ class OllamaSqlGenerator:
         self._llm = llm
 
     def nl_to_sql(self, question: str, *, document_id: str | None = None) -> str:
-        system = (
-            "你是 SQLite 只读查询生成器。根据用户问题生成单条 SELECT。"
-            f"Schema:\n{KG_SCHEMA_FOR_LLM}\n"
-            f"若已知 document_id={document_id!r}，请在 WHERE 中过滤 e.document_id。"
-            "只输出 JSON：{\"sql\":\"SELECT ...\"} LIMIT 必须 <= 20。"
+        system = prompt(
+            "text2sql",
+            schema=KG_SCHEMA_FOR_LLM.strip(),
+            document_id=repr(document_id),
         )
         user = json.dumps({"question": question, "document_id": document_id}, ensure_ascii=False)
         data = self._llm._json_chat(system, user)  # type: ignore[attr-defined]

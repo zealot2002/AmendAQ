@@ -7,26 +7,15 @@ from typing import Any, Protocol
 
 from mycs.log import get_logger
 from mycs.log_detail import log_step
+from mycs.prompts import prompt
 from mycs.wiki.canonical import WikiCanonicalDraft
 from mycs.wiki.ingest_progress import IngestProgressFn, noop_ingest_progress, report_ingest_progress
 
 logger = get_logger(__name__)
 
-COMPILE_SYSTEM = (
-    "你是企业 Wiki / FAQ 编译器。输入可能是：FAQ Markdown、纯文本问答、或「1. 章 / 1.1 节」员工手册。"
-    "统一编成标准 FAQ 目录 JSON：模块为 chapter，每条可检索问答为 leaf（标题像问句，body 为答案全文）。"
-    "员工手册按「1.1」等各节拆成多条 leaf，标题概括该节主题；不要整章合并成一条。"
-    "不要 markdown 包裹。禁止编造原文未出现的电话、金额、政策。"
-    "格式："
-    '{"document":{"title":string},'
-    '"chapters":[{"section_ref":"1","title":string}],'
-    '"leaves":[{"section_ref":"1.1","parent_ref":"1","title":string,"summary":string,'
-    '"body":string,"evidence":{"quote":string,"source_uri":string,"effective_from":string}}],'
-    '"ingest_notes":[string]}。'
-    "规则：chapter section_ref 用纯数字 1..N；leaf 用 parent.leafIndex 如 1.1；"
-    "body 必须是原文答案全文；evidence.quote 必须是 body 的连续子串；"
-    "发现缺题号、题数不符、占位电话等只记入 ingest_notes，不改写事实。"
-)
+
+def compile_system() -> str:
+    return prompt("compile")
 
 CHAPTER_MD = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 QUESTION_MD = re.compile(r"^###\s+(Q\d+[^\n]*)\s*$", re.MULTILINE)
@@ -152,7 +141,7 @@ def _llm_compile_piece(llm: JsonChatLLM, text: str, *, source_uri: str) -> WikiC
         {"source_uri": source_uri, "markdown": text},
         ensure_ascii=False,
     )
-    data = llm._json_chat(COMPILE_SYSTEM, user, max_tokens=8192)
+    data = llm._json_chat(compile_system(), user, max_tokens=8192)
     if source_uri:
         for lf in data.get("leaves") or []:
             ev = lf.get("evidence") or {}
