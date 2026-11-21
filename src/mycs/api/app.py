@@ -91,6 +91,34 @@ def create_app() -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    @app.post("/api/context/active")
+    def set_active_context(body: DocumentBody | None = None) -> dict[str, Any]:
+        """Set active handbook for chat / default API context (no re-ingest)."""
+        doc = ((body.document_id if body else "") or "").strip()
+        if not doc:
+            raise HTTPException(400, "document_id required")
+        ensure_database()
+        from mycs.knowledge.service import KnowledgeService
+
+        svc = KnowledgeService()
+        try:
+            mounts = wiki_admin.list_mounts().get("mounts") or []
+            mount = next((m for m in mounts if str(m.get("document_id") or "") == doc), None)
+            if not mount:
+                raise HTTPException(404, f"未找到知识库：{doc}")
+            title = svc.document_display_title(document_id=doc)
+            published = int(mount.get("published_leaves") or 0)
+        finally:
+            svc.close()
+        set_active_document_id(doc)
+        logger.info("active context document_id=%s published_leaves=%s", doc, published)
+        return {
+            "document_id": doc,
+            "document_title": title,
+            "published_leaves": published,
+            "qa_ready": published > 0,
+        }
+
     @app.get("/api/context")
     def api_context() -> dict[str, Any]:
         from mycs.knowledge.service import KnowledgeService, ensure_database
@@ -138,21 +166,23 @@ def create_app() -> FastAPI:
         return result
 
     @app.post("/api/ingest")
-    def ingest(body: DocumentBody | None = None) -> dict[str, Any]:
+    def ingest(body: IngestBody | None = None) -> dict[str, Any]:
         explicit = (body.document_id if body else "") or ""
         doc = _require_document_id(explicit)
         logger.info("ingest document_id=%s", doc)
+        use_llm = True if body is None else body.use_llm
         try:
-            payload = run_ingest_uploaded(doc)
+            payload = run_ingest_uploaded(doc, use_llm=use_llm)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
         return payload
 
     @app.post("/api/ingest/stream")
-    def ingest_stream(body: DocumentBody | None = None) -> StreamingResponse:
+    def ingest_stream(body: IngestBody | None = None) -> StreamingResponse:
         explicit = (body.document_id if body else "") or ""
         doc = _require_document_id(explicit)
-        logger.info("ingest stream start document_id=%s", doc)
+        use_llm = True if body is None else body.use_llm
+        logger.info("ingest stream start document_id=%s use_llm=%s", doc, use_llm)
 
         event_q: queue.Queue[tuple[str, Any]] = queue.Queue()
 
@@ -161,7 +191,9 @@ def create_app() -> FastAPI:
 
         def worker() -> None:
             try:
-                result = run_ingest_uploaded(doc, on_progress=on_progress)
+                result = run_ingest_uploaded(
+                    doc, on_progress=on_progress, use_llm=use_llm
+                )
                 event_q.put(("done", result))
             except ValueError as exc:
                 event_q.put(("error", str(exc)))
@@ -224,16 +256,25 @@ def create_app() -> FastAPI:
         explicit = (body.document_id if body else "") or ""
         doc = _require_document_id(explicit)
         logger.info("publish document_id=%s", doc)
-        result = wiki_admin.publish_document(doc)
-        if not result.get("ok"):
-            raise HTTPException(404, result.get("message", "publish failed"))
-        set_active_document_id(doc)
-        return {
-            "document_id": doc,
-            "publish": result,
-            "workflow": workflow_state(doc),
-            "toc": wiki_admin.get_toc(doc),
-        }
+        conn = connect(get_db_path())
+        try:
+            from mycs.kb.service import KbService
+
+            kb = KbService(conn)
+            try:
+                kb.get_library(doc)
+                result = kb.publish_library(doc)
+                set_active_document_id(doc)
+                return {
+                    "document_id": doc,
+                    "publish": result,
+                    "workflow": workflow_state(doc),
+                    "library": result,
+                }
+            except KeyError as exc:
+                raise HTTPException(404, "未找到知识库") from exc
+        finally:
+            conn.close()
 
     @app.post("/api/wiki/audit")
     def wiki_audit(body: DocumentBody | None = None) -> dict[str, Any]:
@@ -273,6 +314,193 @@ def create_app() -> FastAPI:
             body.summary or "",
             body.body,
         )
+
+    @app.get("/api/libraries")
+    def kb_list_libraries() -> dict[str, Any]:
+        ensure_database()
+        conn = connect(get_db_path())
+        try:
+            from mycs.kb.service import KbService
+
+            mounts = KbService(conn).list_libraries()
+            return {"libraries": mounts, "count": len(mounts)}
+        finally:
+            conn.close()
+
+    @app.post("/api/libraries")
+    def kb_create_library(body: LibraryBody) -> dict[str, Any]:
+        if not (body.title or "").strip():
+            raise HTTPException(400, "知识库名称不能为空")
+        ensure_database()
+        conn = connect(get_db_path())
+        try:
+            from mycs.kb.service import KbService
+
+            lib = KbService(conn).create_library(
+                title=body.title, description=body.description or ""
+            )
+            return lib
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        finally:
+            conn.close()
+
+    @app.get("/api/libraries/{document_id}")
+    def kb_get_library(document_id: str) -> dict[str, Any]:
+        ensure_database()
+        conn = connect(get_db_path())
+        try:
+            from mycs.kb.service import KbService
+
+            return KbService(conn).get_library(document_id.strip())
+        except KeyError as exc:
+            raise HTTPException(404, "未找到知识库") from exc
+        finally:
+            conn.close()
+
+    @app.patch("/api/libraries/{document_id}")
+    def kb_patch_library(document_id: str, body: LibraryBody) -> dict[str, Any]:
+        ensure_database()
+        conn = connect(get_db_path())
+        try:
+            from mycs.kb.service import KbService
+
+            svc = KbService(conn)
+            return svc.update_library(
+                document_id.strip(),
+                title=body.title,
+                description=body.description,
+            )
+        except KeyError as exc:
+            raise HTTPException(404, "未找到知识库") from exc
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        finally:
+            conn.close()
+
+    @app.delete("/api/libraries/{document_id}")
+    def kb_delete_library(document_id: str) -> dict[str, Any]:
+        ensure_database()
+        conn = connect(get_db_path())
+        try:
+            from mycs.kb.service import KbService
+
+            KbService(conn).delete_library(document_id.strip())
+            return {"ok": True, "document_id": document_id.strip()}
+        except KeyError as exc:
+            raise HTTPException(404, "未找到知识库") from exc
+        finally:
+            conn.close()
+
+    @app.get("/api/libraries/{document_id}/items")
+    def kb_list_items(document_id: str) -> dict[str, Any]:
+        ensure_database()
+        conn = connect(get_db_path())
+        try:
+            from mycs.kb.service import KbService
+
+            items = KbService(conn).list_items(document_id.strip())
+            return {"document_id": document_id.strip(), "items": items, "count": len(items)}
+        except KeyError as exc:
+            raise HTTPException(404, "未找到知识库") from exc
+        finally:
+            conn.close()
+
+    @app.post("/api/libraries/{document_id}/items")
+    def kb_create_item(document_id: str, body: FaqItemBody) -> dict[str, Any]:
+        ensure_database()
+        conn = connect(get_db_path())
+        try:
+            from mycs.kb.service import KbService
+
+            return KbService(conn).create_item(
+                document_id.strip(),
+                question=body.question,
+                answer=body.answer,
+                status=body.status or "draft",
+            )
+        except KeyError as exc:
+            raise HTTPException(404, "未找到知识库") from exc
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        finally:
+            conn.close()
+
+    @app.patch("/api/libraries/{document_id}/items/{item_id}")
+    def kb_patch_item(document_id: str, item_id: str, body: FaqItemBody) -> dict[str, Any]:
+        ensure_database()
+        conn = connect(get_db_path())
+        try:
+            from mycs.kb.service import KbService
+
+            row = conn.execute(
+                "SELECT document_id FROM kb_faq_item WHERE item_id = ?", (item_id,)
+            ).fetchone()
+            if not row or row["document_id"] != document_id.strip():
+                raise HTTPException(404, "条目不存在")
+            return KbService(conn).update_item(
+                item_id,
+                question=body.question,
+                answer=body.answer,
+                status=body.status,
+            )
+        except KeyError as exc:
+            raise HTTPException(404, "条目不存在") from exc
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        finally:
+            conn.close()
+
+    @app.delete("/api/libraries/{document_id}/items/{item_id}")
+    def kb_delete_item(document_id: str, item_id: str) -> dict[str, Any]:
+        ensure_database()
+        conn = connect(get_db_path())
+        try:
+            row = conn.execute(
+                "SELECT document_id FROM kb_faq_item WHERE item_id = ?", (item_id,)
+            ).fetchone()
+            if not row or row["document_id"] != document_id.strip():
+                raise HTTPException(404, "条目不存在")
+            from mycs.kb.service import KbService
+
+            KbService(conn).delete_item(item_id)
+            return {"ok": True, "item_id": item_id}
+        finally:
+            conn.close()
+
+    @app.post("/api/libraries/{document_id}/items/import")
+    def kb_import_items(document_id: str, body: FaqImportBody) -> dict[str, Any]:
+        ensure_database()
+        conn = connect(get_db_path())
+        try:
+            from mycs.kb.service import KbService
+
+            return KbService(conn).import_items(
+                document_id.strip(),
+                body.text,
+                as_draft=body.as_draft if body.as_draft is not None else True,
+            )
+        except KeyError as exc:
+            raise HTTPException(404, "未找到知识库") from exc
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        finally:
+            conn.close()
+
+    @app.post("/api/libraries/{document_id}/publish")
+    def kb_publish_library(document_id: str) -> dict[str, Any]:
+        ensure_database()
+        conn = connect(get_db_path())
+        try:
+            from mycs.kb.service import KbService
+
+            result = KbService(conn).publish_library(document_id.strip())
+            set_active_document_id(document_id.strip())
+            return result
+        except KeyError as exc:
+            raise HTTPException(404, "未找到知识库") from exc
+        finally:
+            conn.close()
 
     @app.post("/api/chat")
     def chat(body: ChatBody) -> dict[str, Any]:
@@ -428,6 +656,11 @@ class DocumentBody(BaseModel):
     document_id: str = ""
 
 
+class IngestBody(BaseModel):
+    document_id: str = ""
+    use_llm: bool = True
+
+
 class IngestPathBody(BaseModel):
     path: str
     document_id: str = ""
@@ -443,3 +676,19 @@ class ChatBody(BaseModel):
     message: str
     document_id: str = ""
     case_id: str = ""
+
+
+class LibraryBody(BaseModel):
+    title: str = ""
+    description: str | None = None
+
+
+class FaqItemBody(BaseModel):
+    question: str | None = None
+    answer: str | None = None
+    status: str | None = None
+
+
+class FaqImportBody(BaseModel):
+    text: str
+    as_draft: bool | None = True

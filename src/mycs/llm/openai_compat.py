@@ -95,30 +95,6 @@ class OpenAICompatLLM:
         )
         return out
 
-    def split_questions(self, question: str) -> dict[str, Any]:
-        system = (
-            "你是客服对话的「题目拆分」模块，与后续的检索、作答流程无关。"
-            "任务：判断用户是否在一次输入里问了**多道彼此独立**的小问题。"
-            "只输出 JSON，不要 markdown。格式："
-            '{"questions":["...",...],"reason":"..."}。'
-            "\n规则："
-            "\n1. 若本质是一道题（哪怕很长、含多个要点但仍围绕同一主题），questions 只含 1 条，"
-            "内容为用户原意的一句完整问句，不要拆碎。"
-            "\n2. 若明显是多道题（如换行、两个问号、「还有/另外」引出第二问），"
-            "questions 为 2–5 条，每条可独立检索 FAQ，保留用户用词。"
-            "\n3. 不要编造用户没问的内容；不要加编号前缀。"
-        )
-        user = json.dumps({"user_input": question}, ensure_ascii=False)
-        try:
-            data = self._json_chat(system, user, max_tokens=512)
-            return {
-                "questions": data.get("questions") or data.get("sub_questions") or [],
-                "reason": str(data.get("reason") or ""),
-            }
-        except Exception as exc:
-            logger.error("llm split_questions failed: %s", exc)
-            raise LLMError(f"split_questions failed: {exc}") from exc
-
     def select_toc_branch(
         self,
         *,
@@ -335,6 +311,7 @@ class OpenAICompatLLM:
         batches_remaining: int,
         enumerative_query: bool = False,
         composite_query: bool = False,
+        recall_exhaustive_batches: bool = True,
     ) -> dict[str, Any]:
         enumerative_note = ""
         if enumerative_query:
@@ -347,12 +324,28 @@ class OpenAICompatLLM:
             composite_note = (
                 "\n\n【多道独立小问题】只勾选直接回答其中某一问的条目。"
             )
+        if batch_total <= 1:
+            flow_note = (
+                "本次已展示本库**全部**问答标题（单批）。"
+                "请直接 pick 所有相关 section_ref；无需 continue。"
+                '可用 action=done 表示已选完。'
+            )
+        elif recall_exhaustive_batches:
+            flow_note = (
+                "系统会分批展示全部问答标题；你须在看完**所有批次**前不要声称已完成。"
+                "在 batches_remaining_after_this > 0 时禁止 action=done/stop，只能用 pick 或 continue。"
+            )
+        else:
+            flow_note = (
+                "系统会分批展示问答标题。若已足够回答用户问题，可用 action=done/stop 结束，"
+                "后续批次将不再展示；仍不确定时请 continue 或 pick。"
+            )
         system = (
             "你是 FAQ 知识库助手。文档是扁平问答列表（每条有 section_ref、title、summary），"
-            "没有章节目录下钻。系统会分批展示全部问答标题；你须在看完**所有批次**前不要声称已完成。"
-            "在 batches_remaining_after_this > 0 时禁止 action=done/stop，只能用 pick 或 continue。"
-            "只输出 JSON："
-            '{"action":"pick"|"continue","section_refs":["§9.3",...],"reason":"..."}。'
+            "没有章节目录下钻。"
+            + flow_note
+            + "只输出 JSON："
+            '{"action":"pick"|"continue"|"done"|"stop","section_refs":["§9.3",...],"reason":"..."}。'
             "\n- pick：本批标题/摘要与用户问题可能相关的条目（可多选）；"
             "- continue：本批全不相关，仍需看后续批次。"
             "\nsection_ref 必须来自 entries_in_batch，不得编造。"
@@ -375,9 +368,10 @@ class OpenAICompatLLM:
             ensure_ascii=False,
         )
         try:
-            data = self._json_chat(system, user, max_tokens=768)
+            cap = 2048 if batch_total <= 1 and entry_total > 24 else 768
+            data = self._json_chat(system, user, max_tokens=cap)
             action = str(data.get("action") or "continue").lower()
-            if action in ("done", "stop") and batches_remaining > 0:
+            if recall_exhaustive_batches and action in ("done", "stop") and batches_remaining > 0:
                 action = "continue"
             refs = data.get("section_refs") or []
             if not isinstance(refs, list):
@@ -488,9 +482,9 @@ class OpenAICompatLLM:
             "\n2. 空一行后写「依据：」：仅作条款对照，每条带 § 号；可简短，勿把仅写在依据里的细节"
             "当作对客答案（细则必须在结论段已写出）。"
             "\n3. 除上述两段外不要写标题、markdown 或客套话。"
-            "\n4. 若 JSON 含 sub_questions，结论段须**逐条**回答每一子问题（可编号对应）；"
+            "\n4. 若用户一次问了多件事（多个问号、换行、还有/另外），结论段须**逐条**回答每一问（可编号）；"
             "不得只答第一条。"
-            "\n5. 若问题涉及多项（如离职+年假+报销），结论段分事项写全；依据段列对应 §。"
+            "\n5. 若问题涉及多项（如积分+兑奖+店主），结论段分事项写全；依据段列对应 §。"
             "严格区分原文措辞：「必须/不得」=强制，「应/原则上」=一般要求，"
             "「建议/可」=非强制。不得把「原则上」写成「必须」。"
         )

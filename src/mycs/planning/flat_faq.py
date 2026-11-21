@@ -13,6 +13,7 @@ from mycs.ui.trace_llm_capture import take_llm_captures
 logger = get_logger(__name__)
 
 DEFAULT_BATCH_SIZE = 8
+DEFAULT_FAQ_SINGLE_PASS_MAX = 120
 
 
 class FaqTitleReviewer(Protocol):
@@ -29,6 +30,7 @@ class FaqTitleReviewer(Protocol):
         batches_remaining: int,
         enumerative_query: bool = False,
         composite_query: bool = False,
+        recall_exhaustive_batches: bool = True,
     ) -> dict[str, Any]: ...
 
 
@@ -42,6 +44,24 @@ class FlatFaqResult:
 
 def _batch_size() -> int:
     return max(3, int(os.environ.get("MYCS_TOC_BATCH_SIZE", str(DEFAULT_BATCH_SIZE))))
+
+
+def _faq_single_pass_max() -> int:
+    return max(8, int(os.environ.get("MYCS_FAQ_SINGLE_PASS_MAX", str(DEFAULT_FAQ_SINGLE_PASS_MAX))))
+
+
+def _faq_recall_exhaustive() -> bool:
+    return os.environ.get("MYCS_FAQ_RECALL_ALL_BATCHES", "0").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def _faq_effective_batch_size(leaf_count: int) -> int:
+    if leaf_count <= _faq_single_pass_max():
+        return leaf_count
+    return _batch_size()
 
 
 def _node_by_ref(nodes: list[dict[str, Any]], ref: str) -> dict[str, Any] | None:
@@ -62,8 +82,18 @@ def _forced_batch_faq_title_select(
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     if not leaves:
         return [], []
-    batch_size = _batch_size()
+    batch_size = _faq_effective_batch_size(len(leaves))
+    exhaustive = _faq_recall_exhaustive()
     batches = [leaves[i : i + batch_size] for i in range(0, len(leaves), batch_size)]
+    log_step(
+        logger,
+        "flat_faq_batch_plan",
+        leaf_total=len(leaves),
+        batch_size=batch_size,
+        batch_total=len(batches),
+        single_pass=len(batches) == 1,
+        exhaustive_batches=exhaustive,
+    )
     picked_nodes: list[dict[str, Any]] = []
     picked_ids: set[str] = set()
     batch_log: list[dict[str, Any]] = []
@@ -88,6 +118,7 @@ def _forced_batch_faq_title_select(
             batches_remaining=batches_remaining,
             enumerative_query=enumerative_query,
             composite_query=composite_query,
+            recall_exhaustive_batches=exhaustive,
         )
         action = str(decision.get("action") or "continue").lower()
         raw_refs = [str(r) for r in (decision.get("section_refs") or []) if r]
@@ -102,13 +133,22 @@ def _forced_batch_faq_title_select(
             )
 
         if action in ("done", "stop") and batches_remaining > 0:
-            log_step(
-                logger,
-                "flat_faq_force_continue",
-                batch_index=batch_idx + 1,
-                ignored_action=action,
-            )
-            action = "continue"
+            if exhaustive:
+                log_step(
+                    logger,
+                    "flat_faq_force_continue",
+                    batch_index=batch_idx + 1,
+                    ignored_action=action,
+                )
+                action = "continue"
+            else:
+                log_step(
+                    logger,
+                    "flat_faq_early_stop",
+                    batch_index=batch_idx + 1,
+                    action=action,
+                    batches_skipped=batches_remaining,
+                )
 
         for ref in refs:
             node = _node_by_ref(leaves, ref) or _node_by_ref(batch, ref)
@@ -132,6 +172,9 @@ def _forced_batch_faq_title_select(
             }
         )
 
+        if action in ("done", "stop") and batches_remaining > 0 and not exhaustive:
+            break
+
     return picked_nodes, batch_log
 
 
@@ -146,10 +189,16 @@ def run_flat_faq_recall(
 ) -> FlatFaqResult:
     """Flat FAQ: all published leaves as (title, summary) list; LLM picks per batch — no chapter drill."""
     result = FlatFaqResult()
-    pack = svc.wiki_list_leaves(document_id=document_id)
+    pack = svc.faq_list_published_leaves(document_id=document_id)
     leaves: list[dict[str, Any]] = list(pack.get("leaves") or [])
     if not leaves:
         result.reason = "no_leaves"
+        log_step(
+            logger,
+            "flat_faq_no_published_leaves",
+            document_id=document_id,
+            hint="ingest_and_publish",
+        )
         return result
 
     if enumerative_query is None:

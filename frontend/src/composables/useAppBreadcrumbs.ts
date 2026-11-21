@@ -21,24 +21,10 @@ export function useAppBreadcrumbs() {
 
     const level1 = { label: T.navLibraryMgmt, to: { name: "library" } as RouteLocationRaw };
 
-    if (name === "library-new") {
-      return [level1, { label: T.navLibraryNew }];
-    }
-
-    if (name === "library-ingest" || name === "library-edit" || name === "library-review") {
+    if (name === "library-detail") {
       const param = String(route.params.documentId || "");
-      const docLabel = documentTitle.value?.trim() || documentId.value?.trim() || param || T.docCode;
-      const leaf =
-        name === "library-ingest"
-          ? T.navLibraryIngest
-          : name === "library-edit"
-            ? T.navLibraryEdit
-            : T.navLibraryReview;
-      return [
-        level1,
-        { label: docLabel, to: { name: "library-edit", params: { documentId: param } } },
-        { label: leaf },
-      ];
+      const docLabel = documentTitle.value?.trim() || param || T.docCode;
+      return [level1, { label: docLabel }];
     }
 
     return [{ label: (route.meta.title as string) || "mycs" }];

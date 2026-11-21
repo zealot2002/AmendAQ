@@ -23,8 +23,20 @@ class _FakeLeavesSvc:
             },
         ]
 
+    def faq_list_published_leaves(self, *, document_id: str) -> dict[str, Any]:
+        slim = [
+            {
+                "section_ref": x["section_ref"],
+                "title": x["title"],
+                "summary": "",
+                "node_id": x["node_id"],
+            }
+            for x in self.leaves
+        ]
+        return {"leaves": slim}
+
     def wiki_list_leaves(self, *, document_id: str) -> dict[str, Any]:
-        return {"leaves": self.leaves}
+        return self.faq_list_published_leaves(document_id=document_id)
 
     def document_display_title(self, *, document_id: str) -> str:
         return "好势 FAQ"
@@ -52,3 +64,44 @@ def test_flat_faq_picks_matching_title_only():
 def test_infer_catalog_mode_for_faq_id():
     assert infer_catalog_mode("faq") == CATALOG_FLAT_FAQ
     assert infer_catalog_mode("employee_handbook") != CATALOG_FLAT_FAQ
+
+
+class _CountingPickLLM:
+    calls = 0
+
+    def review_faq_title_batch(self, **kwargs: Any) -> dict[str, Any]:
+        _CountingPickLLM.calls += 1
+        assert kwargs["batch_total"] == 1
+        batch = kwargs["entries_in_batch"]
+        assert len(batch) == 12
+        return {"action": "done", "section_refs": [str(batch[0]["section_ref"])], "reason": "one-shot"}
+
+
+def test_flat_faq_single_pass_under_max(monkeypatch):
+    monkeypatch.setenv("MYCS_FAQ_SINGLE_PASS_MAX", "120")
+
+    class _ManyLeavesSvc(_FakeLeavesSvc):
+        def faq_list_published_leaves(self, *, document_id: str) -> dict[str, Any]:
+            base = super().faq_list_published_leaves(document_id=document_id)
+            extra = [
+                {
+                    "section_ref": f"§{i}.{i}",
+                    "title": f"条目{i}",
+                    "summary": "",
+                    "node_id": f"n{i}",
+                }
+                for i in range(3, 13)
+            ]
+            base["leaves"] = list(base["leaves"]) + extra
+            return base
+
+    _CountingPickLLM.calls = 0
+    flat = run_flat_faq_recall(
+        llm=_CountingPickLLM(),
+        svc=_ManyLeavesSvc(),  # type: ignore[arg-type]
+        document_id="faq",
+        question="任意",
+    )
+    assert _CountingPickLLM.calls == 1
+    assert len(flat.trace_events) == 1
+    assert flat.reason == "flat_faq_done"

@@ -4,10 +4,10 @@ import json
 import os
 import time
 from collections.abc import Callable
-from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+from mycs.db.catalog_mode import CATALOG_FLAT_FAQ
 from mycs.knowledge.service import KnowledgeService
 from mycs.llm.base import AgentLLM
 from mycs.llm.factory import create_llm
@@ -16,7 +16,6 @@ from mycs.log_detail import log_step, summarize_tool_result
 from mycs.models import AgentRunResult, KnowledgeRequirement, KnowledgeSource, TraceEvent, VerifyResult
 from mycs.planning.plan_schema import apply_toc_section_whitelist
 from mycs.planning.resolver import GapResolver
-from mycs.planning.question_split import resolve_sub_questions
 from mycs.skills.loader import evidence_text, load_skills, match_skills
 from mycs.tools.registry import ToolRegistry
 from mycs.ui.trace_kinds import resolve_step_kind
@@ -128,94 +127,8 @@ class AgentLoop:
                 "graph_document_title": graph_doc_title,
             },
         )
-        progress("正在判断是否需要拆分多个子问题…")
-        sub_questions, split_meta = resolve_sub_questions(self._llm, question)
-        if split_meta.get("llm_invoked"):
-            pending = take_llm_captures()
-            if pending:
-                split_meta["llm_calls"] = pending
-        emit(
-            "question_split",
-            {
-                **split_meta,
-                "original_question": question,
-            },
-        )
-
-        multi_sub = (
-            len(sub_questions) > 1
-            and understood.intent == "graph_qa"
-            and bool(understood.graph_document_id)
-        )
-        if multi_sub:
-            from mycs.answer_format import answer_for_user, split_answer_sections
-
-            user_parts: list[str] = []
-            all_checks: list[dict[str, Any]] = []
-            verify_ok = True
-            for idx, sq in enumerate(sub_questions):
-                progress(f"正在处理第 {idx + 1}/{len(sub_questions)} 个子问题…")
-                emit(
-                    "sub_question",
-                    {
-                        "index": idx + 1,
-                        "total": len(sub_questions),
-                        "text": sq,
-                        "llm_invoked": False,
-                    },
-                )
-                sub_u = replace(understood, raw_question=sq)
-                sub_ctx: dict[str, Any] = {
-                    "raw_question": sq,
-                    "graph_document_id": understood.graph_document_id,
-                    "graph_document_title": graph_doc_title,
-                }
-                answer, _claims, verify, _calls = self._run_retrieval_and_compose(
-                    sub_u,
-                    sub_ctx,
-                    emit=emit,
-                    progress=progress,
-                )
-                user_parts.append((answer_for_user(answer) or answer).strip())
-                verify_ok = verify_ok and verify.ok
-                all_checks.extend(verify.checks)
-            user_answer = "\n\n".join(p for p in user_parts if p)
-            verify = VerifyResult(
-                ok=verify_ok,
-                checks=all_checks,
-                message="multi_sub_question verify",
-            )
-            emit(
-                "answer",
-                {
-                    "text": user_answer,
-                    "claims": {"sub_question_count": len(sub_questions)},
-                    "multi_sub": True,
-                },
-            )
-            elapsed = round(time.perf_counter() - run_started, 1)
-            log_step(
-                logger,
-                "agent_run_done",
-                verify_ok=verify.ok,
-                answer_preview=user_answer[:200],
-                answer_full_len=len(user_answer),
-                multi_sub=len(sub_questions),
-                elapsed_seconds=elapsed,
-            )
-            return AgentRunResult(
-                question=question,
-                case_id=understood.case_id,
-                answer=user_answer,
-                trace=trace,
-                verify=verify,
-                elapsed_seconds=elapsed,
-            )
-
-        active_q = sub_questions[0] if sub_questions else question
-        understood = replace(understood, raw_question=active_q)
         context: dict[str, Any] = {
-            "raw_question": active_q,
+            "raw_question": question,
             "graph_document_id": understood.graph_document_id,
             "graph_document_title": graph_doc_title,
         }
@@ -295,6 +208,46 @@ class AgentLoop:
                 )
             finally:
                 svc.close()
+
+        recall_reason = str(plan_context.get("recall_reason") or "")
+        if (
+            understood.intent == "graph_qa"
+            and not comprehensive_leaf_refs
+            and plan_context.get("catalog_mode") == CATALOG_FLAT_FAQ
+        ):
+            if recall_reason == "no_leaves":
+                log_step(logger, "agent_faq_catalog_empty", document_id=understood.graph_document_id)
+                msg = (
+                    "结论：当前知识库中**没有已上线的问答条目**，无法检索作答。"
+                    "请在「知识库 → 详情」中添加或导入 FAQ，并点击「正式发布」后再提问。\n\n"
+                    "依据：（无）"
+                )
+            else:
+                log_step(
+                    logger,
+                    "agent_faq_recall_empty",
+                    document_id=understood.graph_document_id,
+                    reason=recall_reason,
+                )
+                msg = (
+                    "结论：已在全部 FAQ 标题中检索，未找到与您问题明显相关的条目。"
+                    "请换个问法或联系人工客服。\n\n依据：（无）"
+                )
+            emit(
+                "plan",
+                {
+                    "knowledge_requirements": [],
+                    "plan_source": "flat_faq",
+                    "llm_invoked": False,
+                    "plan_context": {"recall_reason": recall_reason},
+                },
+            )
+            return (
+                msg,
+                {},
+                VerifyResult(ok=False, checks=[], message="faq_recall_empty"),
+                take_llm_captures(),
+            )
 
         dropped_guard = 0
         sibling_added = 0

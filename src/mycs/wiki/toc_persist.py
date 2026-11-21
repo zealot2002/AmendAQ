@@ -154,10 +154,20 @@ def ingest_document_toc_from_roots(
 ) -> dict[str, Any]:
     """Write draft TOC from pre-built outline; sync kg graph."""
     mount_id = ensure_mount(conn, document_id=document_id, display_title=title)
-    conn.execute(
-        "DELETE FROM wiki_toc_node WHERE mount_id = ? AND status = 'draft'",
+    # Re-ingest reuses stable node_id patterns; drop prior chapter/leaf (draft or published).
+    removed = conn.execute(
+        """
+        DELETE FROM wiki_toc_node
+        WHERE mount_id = ? AND kind IN ('chapter', 'leaf')
+        """,
         (mount_id,),
-    )
+    ).rowcount
+    if removed:
+        logger.info(
+            "joyjoy: ingest cleared prior toc nodes mount=%s removed=%s",
+            mount_id,
+            removed,
+        )
     mount_row = conn.execute(
         "SELECT parent_node_id FROM wiki_document_mount WHERE mount_id = ?",
         (mount_id,),

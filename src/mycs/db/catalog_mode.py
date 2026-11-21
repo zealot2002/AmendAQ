@@ -49,6 +49,12 @@ def get_catalog_mode(conn: sqlite3.Connection, document_id: str) -> str:
     doc = (document_id or "").strip()
     if not doc:
         return CATALOG_HIERARCHICAL
+    kb = conn.execute(
+        "SELECT 1 FROM kb_library WHERE document_id = ? LIMIT 1",
+        (doc,),
+    ).fetchone()
+    if kb:
+        return CATALOG_FLAT_FAQ
     if not _column_exists(conn, "kg_document", "catalog_mode"):
         return infer_catalog_mode(doc)
     row = conn.execute(

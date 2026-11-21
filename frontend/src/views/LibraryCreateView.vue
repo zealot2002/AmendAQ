@@ -9,27 +9,14 @@
     <el-card shadow="never" class="panel">
       <template v-if="phase === 'upload'">
         <p class="step-label">第 1 步</p>
-        <p class="hint">{{ EXTERNAL_ORGANIZE_HINT }}</p>
-        <el-alert type="warning" :closable="false" show-icon class="format-alert" :title="T.docFormatHint" />
-        <el-card shadow="never" class="prompt-card">
-          <template #header>
-            <div class="prompt-header">
-              <span>{{ T.organizePromptTitle }}</span>
-              <el-button type="primary" size="small" @click="copyOrganizePrompt">
-                {{ T.organizePromptCopy }}
-              </el-button>
-            </div>
-          </template>
-          <el-input
-            :model-value="EXTERNAL_ORGANIZE_PROMPT"
-            type="textarea"
-            :rows="14"
-            readonly
-            class="prompt-text"
-          />
-          <p class="prompt-foot">{{ T.handbookOrganizeNote }}</p>
-        </el-card>
+        <p class="hint">{{ T.ingestHint }}</p>
+        <el-alert type="info" :closable="false" show-icon class="format-alert" :title="T.docFormatHint" />
         <el-form label-position="top">
+          <el-form-item>
+            <el-switch v-model="useLlmIngest" :disabled="loading.busy" />
+            <span class="switch-label">{{ T.ingestUseLlm }}</span>
+            <p class="switch-hint">{{ T.ingestUseLlmHint }}</p>
+          </el-form-item>
           <el-form-item :label="T.uploadFileLabel">
             <el-upload
               :auto-upload="false"
@@ -85,12 +72,15 @@
           <p class="progress-msg">{{ ingestProgress.message }}</p>
           <el-button link type="primary" @click="openLogs">{{ T.ingestOpenLogs }}</el-button>
         </div>
+        <el-form-item v-if="!ingesting" class="ingest-llm-row">
+          <el-switch v-model="useLlmIngest" />
+          <span class="switch-label">{{ T.ingestUseLlm }}</span>
+        </el-form-item>
         <el-button
-          v-else
+          v-if="!ingesting"
           type="primary"
           size="large"
           class="primary-cta"
-          :disabled="ingesting"
           @click="doIngest"
         >
           {{ T.btnParse }}
@@ -122,7 +112,6 @@ import { computed, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import type { UploadFile, UploadUserFile } from "element-plus";
 import { ElMessage } from "element-plus";
-import { EXTERNAL_ORGANIZE_HINT, EXTERNAL_ORGANIZE_PROMPT } from "@/constants/organizePrompt";
 import { T } from "@/constants/terminology";
 import {
   fetchWorkflow,
@@ -146,31 +135,27 @@ const loading = reactive({ upload: false, ingest: false, publish: false, busy: f
 const busyPhase = ref<"upload" | "ingest" | "">("");
 const ingesting = computed(() => loading.ingest || busyPhase.value === "ingest");
 const ingestProgress = reactive({ percent: 0, message: "准备中…" });
+const useLlmIngest = ref(true);
 const { showLogDock } = useLogDock();
 
 function openLogs() {
   showLogDock();
 }
 
-async function copyOrganizePrompt() {
-  try {
-    await navigator.clipboard.writeText(EXTERNAL_ORGANIZE_PROMPT);
-    ElMessage.success(T.organizePromptCopied);
-  } catch {
-    ElMessage.error("复制失败，请手动选中上方文本");
-  }
-}
-
 async function runIngestStream(doc: string) {
   ingestProgress.percent = 0;
   ingestProgress.message = "启动整理…";
   showLogDock();
-  await ingestDocumentStream(doc, {
-    onProgress: (p) => {
-      ingestProgress.percent = p.percent;
-      ingestProgress.message = p.message;
+  await ingestDocumentStream(
+    doc,
+    {
+      onProgress: (p) => {
+        ingestProgress.percent = p.percent;
+        ingestProgress.message = p.message;
+      },
     },
-  });
+    useLlmIngest.value,
+  );
 }
 
 const busyLabel = computed(() => {
@@ -398,10 +383,18 @@ function goEdit() {
   font-size: 12px;
   line-height: 1.5;
 }
-.prompt-foot {
-  margin: 12px 0 0;
+.switch-label {
+  margin-left: 10px;
+  font-size: 14px;
+  color: #303133;
+  font-weight: 500;
+}
+.switch-hint {
+  margin: 8px 0 0;
   font-size: 13px;
   color: #909399;
-  line-height: 1.5;
+}
+.ingest-llm-row {
+  margin-bottom: 12px;
 }
 </style>

@@ -18,8 +18,29 @@ export interface Mount {
   document_id: string;
   mount_id: string;
   display_title?: string;
+  description?: string;
   draft_count?: number;
   published_leaves?: number;
+  item_count?: number;
+}
+
+export interface Library {
+  document_id: string;
+  title: string;
+  description?: string;
+  draft_count?: number;
+  published_leaves?: number;
+  item_count?: number;
+  mount_id?: string;
+}
+
+export interface FaqItem {
+  item_id: string;
+  document_id: string;
+  question: string;
+  answer: string;
+  status: string;
+  sort_key: number;
 }
 
 export interface TocNode {
@@ -58,6 +79,16 @@ export async function fetchContext() {
   return data;
 }
 
+export async function setActiveDocument(documentId: string) {
+  const { data } = await http.post<{
+    document_id: string;
+    document_title?: string;
+    published_leaves?: number;
+    qa_ready?: boolean;
+  }>("/context/active", { document_id: documentId });
+  return data;
+}
+
 export async function fetchMounts() {
   const { data } = await http.get<{ mounts: Mount[]; count: number }>("/mounts");
   return data;
@@ -83,10 +114,10 @@ export async function uploadDocument(file: File) {
   return data;
 }
 
-export async function ingestDocument(documentId?: string) {
+export async function ingestDocument(documentId?: string, useLlm = true) {
   const { data } = await http.post(
     "/ingest",
-    documentId ? { document_id: documentId } : {},
+    { document_id: documentId || "", use_llm: useLlm },
     { timeout: 600_000 },
   );
   return data;
@@ -99,11 +130,12 @@ export async function ingestDocumentStream(
   handlers: {
     onProgress?: (payload: IngestProgressPayload) => void;
   },
+  useLlm = true,
 ): Promise<{ document_id: string; workflow: WorkflowState; toc: unknown }> {
   const res = await fetch("/api/ingest/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ document_id: documentId }),
+    body: JSON.stringify({ document_id: documentId, use_llm: useLlm }),
   });
   if (!res.ok) {
     const text = await res.text();
@@ -296,6 +328,84 @@ export async function chatStream(
     throw new Error("未收到完整回答");
   }
   return finalResult;
+}
+
+export async function fetchLibraries() {
+  const { data } = await http.get<{ libraries: Library[]; count: number }>("/libraries");
+  return data;
+}
+
+export async function createLibrary(title: string, description = "") {
+  const { data } = await http.post<Library>("/libraries", { title, description });
+  return data;
+}
+
+export async function fetchLibrary(documentId: string) {
+  const { data } = await http.get<Library>(`/libraries/${encodeURIComponent(documentId)}`);
+  return data;
+}
+
+export async function updateLibrary(documentId: string, payload: { title?: string; description?: string }) {
+  const { data } = await http.patch<Library>(`/libraries/${encodeURIComponent(documentId)}`, payload);
+  return data;
+}
+
+export async function deleteLibrary(documentId: string) {
+  const { data } = await http.delete<{ ok: boolean }>(`/libraries/${encodeURIComponent(documentId)}`);
+  return data;
+}
+
+export async function fetchFaqItems(documentId: string) {
+  const { data } = await http.get<{ items: FaqItem[]; count: number }>(
+    `/libraries/${encodeURIComponent(documentId)}/items`,
+  );
+  return data;
+}
+
+export async function createFaqItem(
+  documentId: string,
+  question: string,
+  answer: string,
+  status = "draft",
+) {
+  const { data } = await http.post<FaqItem>(`/libraries/${encodeURIComponent(documentId)}/items`, {
+    question,
+    answer,
+    status,
+  });
+  return data;
+}
+
+export async function updateFaqItem(
+  documentId: string,
+  itemId: string,
+  payload: { question?: string; answer?: string; status?: string },
+) {
+  const { data } = await http.patch<FaqItem>(
+    `/libraries/${encodeURIComponent(documentId)}/items/${encodeURIComponent(itemId)}`,
+    payload,
+  );
+  return data;
+}
+
+export async function deleteFaqItem(documentId: string, itemId: string) {
+  const { data } = await http.delete<{ ok: boolean }>(
+    `/libraries/${encodeURIComponent(documentId)}/items/${encodeURIComponent(itemId)}`,
+  );
+  return data;
+}
+
+export async function importFaqItems(documentId: string, text: string, asDraft = true) {
+  const { data } = await http.post<{ imported: number; skipped?: number; document_id: string }>(
+    `/libraries/${encodeURIComponent(documentId)}/items/import`,
+    { text, as_draft: asDraft },
+  );
+  return data;
+}
+
+export async function publishLibrary(documentId: string) {
+  const { data } = await http.post(`/libraries/${encodeURIComponent(documentId)}/publish`);
+  return data;
 }
 
 export default http;

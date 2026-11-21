@@ -74,6 +74,11 @@ def normalize_requirements(
             for r in reqs
             if r.source in (KnowledgeSource.GRAPH, KnowledgeSource.WIKI)
         ]
+        reqs = [
+            r
+            for r in reqs
+            if r.field != "graph.entity.by_section" or str(r.params.get("section") or "")
+        ]
         reqs = _ensure_graph_baseline(reqs, doc=doc, question=q)
     return reqs
 

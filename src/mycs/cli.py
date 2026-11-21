@@ -156,6 +156,47 @@ def _cmd_ingest_txt(argv: list[str]) -> int:
     return 0
 
 
+def _cmd_ingest_canonical(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="mycs ingest canonical")
+    parser.add_argument(
+        "path",
+        type=Path,
+        help="Path to data/ingest/<doc_id>.canonical.json",
+    )
+    parser.add_argument("--doc-id", dest="doc_id", default=None)
+    parser.add_argument(
+        "--publish",
+        action="store_true",
+        help="After ingest, publish wiki TOC for this document",
+    )
+    args = parser.parse_args(argv)
+    if not args.path.is_file():
+        print(f"file not found: {args.path}", file=sys.stderr)
+        return 1
+    ensure_database()
+    try:
+        from mycs.wiki.ingest_compile import ingest_canonical_json
+
+        meta = ingest_canonical_json(
+            args.path,
+            document_id=args.doc_id,
+            publish=args.publish,
+        )
+    except (ValueError, FileNotFoundError) as exc:
+        logger.error("ingest canonical failed: %s", exc)
+        print(f"失败: {exc}", file=sys.stderr)
+        return 2
+    doc = meta["document_id"]
+    print(
+        f"joyjoy: imported canonical document_id={doc} "
+        f"chapters={meta.get('chapters')} leaves={meta.get('leaves')} "
+        f"draft_nodes={meta.get('draft_nodes')}"
+    )
+    if args.publish:
+        print(f"joyjoy: published mount_{doc}")
+    return 0
+
+
 def _cmd_ingest_compile(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="mycs ingest compile")
     parser.add_argument("path", type=Path, help="Path to .md or .txt FAQ / document")
@@ -207,7 +248,7 @@ def _cmd_ingest_compile(argv: list[str]) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(argv) if argv is not None else sys.argv[1:]
-    if argv and argv[0] == "reset-data":
+    if argv and argv[0] in ("reset", "reset-data"):
         return _cmd_reset_data(argv[1:])
     if argv and argv[0] == "bootstrap":
         return _cmd_bootstrap()
@@ -217,6 +258,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_ingest_txt(argv[2:])
     if len(argv) >= 2 and argv[0] == "ingest" and argv[1] == "compile":
         return _cmd_ingest_compile(argv[2:])
+    if len(argv) >= 2 and argv[0] == "ingest" and argv[1] == "canonical":
+        return _cmd_ingest_canonical(argv[2:])
     if len(argv) >= 2 and argv[0] == "wiki" and argv[1] == "publish":
         return _cmd_wiki_publish(argv[2:])
     if len(argv) >= 2 and argv[0] == "wiki" and argv[1] == "audit":
@@ -255,6 +298,7 @@ def main(argv: list[str] | None = None) -> int:
         print("  export MYCS_GRAPH_DOCUMENT=<doc_id>", file=sys.stderr)
         print("  uv run mycs ingest txt your.txt --doc-id <doc_id>", file=sys.stderr)
         print("  uv run mycs ingest compile handbook.md --doc-id <doc_id>", file=sys.stderr)
+        print("  uv run mycs ingest canonical data/ingest/faq.canonical.json --doc-id faq --publish", file=sys.stderr)
         return 1
 
     try:

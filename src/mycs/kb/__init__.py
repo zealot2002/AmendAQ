@@ -1,0 +1,1 @@
+"""Flat FAQ knowledge base (library + items)."""

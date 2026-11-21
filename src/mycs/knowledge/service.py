@@ -277,19 +277,29 @@ class KnowledgeService:
         chapters = slim_toc_choice(nodes)
         return {"document_id": document_id, "chapters": chapters, "count": len(chapters)}
 
+    def faq_list_published_leaves(self, *, document_id: str) -> dict[str, Any]:
+        from mycs.kb.faq_read import faq_leaf_rows
+
+        leaves = faq_leaf_rows(self._conn, document_id=document_id, statuses=("published",))
+        slim = [
+            {
+                "section_ref": lf["section_ref"],
+                "title": lf["title"],
+                "summary": lf["summary"],
+                "node_id": lf["node_id"],
+            }
+            for lf in leaves
+        ]
+        return {"document_id": document_id, "leaves": slim, "count": len(slim)}
+
     def wiki_list_leaves(self, *, document_id: str) -> dict[str, Any]:
-        nodes = fetch_nodes(
-            self._conn,
-            document_id=document_id,
-            kinds=("leaf",),
-        )
-        leaves = slim_toc_choice(nodes)
-        return {"document_id": document_id, "leaves": leaves, "count": len(leaves)}
+        """Deprecated alias: flat FAQ reads kb_faq_item."""
+        return self.faq_list_published_leaves(document_id=document_id)
 
     def document_catalog_mode(self, *, document_id: str) -> str:
-        from mycs.db.catalog_mode import get_catalog_mode
+        from mycs.db.catalog_mode import CATALOG_FLAT_FAQ
 
-        return get_catalog_mode(self._conn, document_id)
+        return CATALOG_FLAT_FAQ
 
     def wiki_outline_for_chapters(
         self,
@@ -421,10 +431,17 @@ class KnowledgeService:
         if not doc:
             return ""
         stored = ""
-        for m in list_mounts(self._conn):
-            if str(m.get("document_id") or "") == doc:
-                stored = str(m.get("display_title") or "").strip()
-                break
+        kb = self._conn.execute(
+            "SELECT title FROM kb_library WHERE document_id = ? LIMIT 1",
+            (doc,),
+        ).fetchone()
+        if kb and kb["title"]:
+            stored = str(kb["title"]).strip()
+        if not stored:
+            for m in list_mounts(self._conn):
+                if str(m.get("document_id") or "") == doc:
+                    stored = str(m.get("display_title") or "").strip()
+                    break
         if not stored:
             row = self._conn.execute(
                 "SELECT title FROM kg_document WHERE document_id = ? LIMIT 1",
@@ -501,9 +518,16 @@ class KnowledgeService:
             f"SELECT * FROM kg_entity e WHERE {' AND '.join(clauses)}",
             params,
         ).fetchone()
-        if not row:
-            raise KeyError(f"no entity section={section} document_id={document_id}")
-        return self.kg_get_entity(row["entity_id"])
+        if row:
+            return self.kg_get_entity(row["entity_id"])
+        from mycs.kb.faq_read import faq_entity_from_section
+
+        fallback = faq_entity_from_section(
+            self._conn, section, document_id=document_id
+        )
+        if fallback:
+            return fallback
+        raise KeyError(f"no entity section={section} document_id={document_id}")
 
     def kg_get_entity(self, entity_id: str) -> dict[str, Any]:
         row = self._conn.execute(

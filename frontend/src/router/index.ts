@@ -19,26 +19,13 @@ const router = createRouter({
         {
           path: "library/new",
           name: "library-new",
-          component: () => import("@/views/LibraryCreateView.vue"),
-          meta: { title: T.navLibraryNew, menu: "/library" },
+          redirect: { name: "library" },
         },
         {
-          path: "library/:documentId/ingest",
-          name: "library-ingest",
-          component: () => import("@/views/LibraryCreateView.vue"),
-          meta: { title: T.navLibraryIngest, menu: "/library" },
-        },
-        {
-          path: "library/:documentId/edit",
-          name: "library-edit",
-          component: () => import("@/views/WorkflowView.vue"),
-          meta: { title: T.navLibraryEdit, menu: "/library" },
-        },
-        {
-          path: "library/:documentId/review",
-          name: "library-review",
-          component: () => import("@/views/WikiReviewView.vue"),
-          meta: { title: T.navLibraryReview, menu: "/library", fullHeight: true },
+          path: "library/:documentId",
+          name: "library-detail",
+          component: () => import("@/views/KnowledgeDetailView.vue"),
+          meta: { title: T.navLibraryDetail, menu: "/library" },
         },
         {
           path: "chat",
@@ -54,9 +41,9 @@ const router = createRouter({
         },
         {
           path: "library/_/edit",
-          redirect: { name: "library-new" },
+          redirect: { name: "library" },
         },
-        { path: "workflow", redirect: { name: "library-new" } },
+        { path: "workflow", redirect: { name: "library" } },
         { path: "wiki", redirect: "/library" },
         { path: "mounts", redirect: "/library" },
       ],

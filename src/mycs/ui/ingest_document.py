@@ -4,26 +4,21 @@ import os
 from pathlib import Path
 from typing import Callable
 
-from mycs.graph.extract import ingest_txt_file
-from mycs.wiki.ingest_contract import enforce_handbook_contract
-from mycs.wiki.outline import parse_outline_from_text
 from mycs.knowledge.service import ensure_database
 from mycs.log import get_logger
 from mycs.log_detail import log_step
+from mycs.wiki.compile import compile_faq_markdown_rules
 from mycs.wiki.ingest_progress import report_ingest_progress, wrap_progress
 
 logger = get_logger(__name__)
 
 _FORMAT_HINT = (
-    "文档不符合规范：.md 须为「## 模块 + ### 问 + 答：」FAQ；"
-    ".txt 须为「1. 章 + 1.1 节」编号手册。"
+    "纯文本 / 不规范排版时，请开启「大模型整理为 FAQ」后重试；"
+    "或整理为规范 .md（## 模块 + ### Qn + **答：**）。"
 )
 
 _DOC_SPEC_MD = (
     "Markdown：一级标题为文档名；模块用 ##；每题 ### Qn. 标题；答案以 **答：** 开头。"
-)
-_DOC_SPEC_TXT = (
-    "文本：章用「1. 标题」；节用「1.1 标题」；节下为正文。"
 )
 
 
@@ -31,71 +26,93 @@ def _looks_faq_markdown(text: str) -> bool:
     return "##" in text and ("###" in text or "答" in text or "答：" in text)
 
 
+def _env_bool(name: str, default: str = "1") -> bool:
+    return os.environ.get(name, default).strip().lower() in ("1", "true", "yes")
+
+
 def ingest_document_file(
     src: Path,
     *,
     document_id: str,
     on_progress: Callable[[str, int, str], None] | None = None,
+    use_llm: bool | None = None,
 ) -> None:
-    """Deterministic ingest only — no LLM. FAQ-shaped md or numbered txt."""
+    """FAQ 入库：优先规范 md 规则解析；否则大模型 compile → Wiki 草稿（可二次编辑）。"""
     progress = wrap_progress(on_progress) if on_progress else None
     text = src.read_text(encoding="utf-8")
-    ext = src.suffix.lower()
+    source_uri = f"file://{src.resolve()}"
 
-    force_legacy = os.environ.get("MYCS_INGEST_LEGACY_TXT", "").strip() in ("1", "true", "yes")
-    use_faq = ext in {".md", ".markdown"} or _looks_faq_markdown(text)
+    if use_llm is None:
+        use_llm = _env_bool("MYCS_INGEST_FAQ_LLM", "1")
 
-    if use_faq and not force_legacy:
-        from mycs.wiki.ingest_compile import ingest_compile_file
+    from mycs.wiki.ingest_compile import ingest_compile_file
+
+    rules_first = _env_bool("MYCS_INGEST_RULES_FIRST", "1")
+    if rules_first and _looks_faq_markdown(text):
+        preview = compile_faq_markdown_rules(text, source_uri=source_uri)
+        if preview.leaves:
+            if progress:
+                report_ingest_progress(
+                    progress, stage="parse", percent=15, message="按 FAQ 规范解析 Markdown"
+                )
+            log_step(
+                logger,
+                "workflow_ingest_faq_rules",
+                document_id=document_id,
+                source=str(src),
+                leaves=len(preview.leaves),
+            )
+            try:
+                ingest_compile_file(
+                    src,
+                    document_id=document_id,
+                    llm=None,
+                    rules_only=True,
+                    on_progress=progress,
+                )
+            except ValueError as exc:
+                raise ValueError(f"{exc}。{_FORMAT_HINT} {_DOC_SPEC_MD}") from exc
+            return
+
+    if use_llm:
+        from mycs.llm.factory import create_llm
 
         if progress:
             report_ingest_progress(
-                progress, stage="parse", percent=15, message="按 FAQ 规范解析 Markdown"
+                progress,
+                stage="compile",
+                percent=12,
+                message="大模型整理为 FAQ（首次可能较慢）…",
             )
         log_step(
             logger,
-            "workflow_ingest_faq_rules",
+            "workflow_ingest_faq_llm",
             document_id=document_id,
             source=str(src),
-            spec=_DOC_SPEC_MD,
+            chars=len(text),
         )
         try:
             ingest_compile_file(
                 src,
                 document_id=document_id,
-                llm=None,
-                rules_only=True,
+                llm=create_llm(),
+                rules_only=False,
                 on_progress=progress,
             )
         except ValueError as exc:
-            raise ValueError(f"{exc}。{_FORMAT_HINT} {_DOC_SPEC_MD}") from exc
+            raise ValueError(f"{exc}。{_FORMAT_HINT}") from exc
         return
 
-    if progress:
-        report_ingest_progress(
-            progress, stage="parse", percent=20, message="按编号章节解析 txt"
-        )
-    source_uri = f"file://{src.resolve()}"
-    roots = parse_outline_from_text(text, source_uri=source_uri)
-    try:
-        enforce_handbook_contract(text, roots)
-    except ValueError as exc:
-        raise ValueError(f"{exc}。{_FORMAT_HINT} {_DOC_SPEC_TXT}") from exc
-    log_step(
-        logger,
-        "workflow_ingest_numbered_txt",
-        document_id=document_id,
-        source=str(src),
-        spec=_DOC_SPEC_TXT,
+    raise ValueError(
+        f"无法按规则解析该文档，且未启用大模型整理。{_FORMAT_HINT} {_DOC_SPEC_MD}"
     )
-    ingest_txt_file(src, document_id=document_id)
-    if progress:
-        report_ingest_progress(progress, stage="done", percent=100, message="整理完成")
 
 
 def run_ingest_uploaded(
     document_id: str,
     on_progress: Callable[[str, int, str], None] | None = None,
+    *,
+    use_llm: bool | None = None,
 ) -> dict:
     from mycs.ui.active_document import resolve_active_document_id, set_active_document_id
     from mycs.ui.workflow import _ensure_upload_dir, workflow_state
@@ -108,14 +125,18 @@ def run_ingest_uploaded(
     if not candidates:
         raise ValueError("请先上传文档")
     src = max(candidates, key=lambda p: p.stat().st_mtime)
-    log_step(logger, "workflow_ingest_start", document_id=doc, source=str(src))
-    ingest_document_file(src, document_id=doc, on_progress=on_progress)
+    log_step(
+        logger,
+        "workflow_ingest_start",
+        document_id=doc,
+        source=str(src),
+        use_llm=use_llm,
+    )
+    ingest_document_file(src, document_id=doc, on_progress=on_progress, use_llm=use_llm)
     set_active_document_id(doc)
     st = workflow_state(doc)
     if (st.get("draft_nodes") or 0) == 0:
-        raise ValueError(
-            f"未生成目录条目，请检查文档格式。{_FORMAT_HINT} {_DOC_SPEC_TXT} {_DOC_SPEC_MD}"
-        )
+        raise ValueError(f"未生成目录条目。{_FORMAT_HINT}")
     log_step(
         logger,
         "workflow_ingest_done",

@@ -64,22 +64,6 @@ def _llm_label(p: dict[str, Any] | None = None) -> str:
 
 
 def _narrate(step: str, p: dict[str, Any], *, question: str) -> dict[str, str]:
-    if step == "question_split":
-        qs = p.get("questions") or []
-        reason = str(p.get("reason") or "")
-        return {
-            "summary": f"调用 {_llm_label(p)}：将用户输入拆成 {len(qs)} 道独立子问题（专用 prompt，与检索无关）。",
-            "input": _clip(question, 400),
-            "output": "；".join(_clip(str(q), 120) for q in qs[:6]) or reason or "（未拆分）",
-        }
-
-    if step == "sub_question":
-        return {
-            "summary": "编排：对单个子问题走完整目录寻址 → 拉正文 → 作答。",
-            "input": _clip(str(p.get("text") or ""), 300),
-            "output": f"第 {int(p.get('index') or 0)}/{int(p.get('total') or 0)} 题",
-        }
-
     if step == "understand":
         intent = str(p.get("intent") or "")
         doc_id = str(p.get("graph_document_id") or "").strip()

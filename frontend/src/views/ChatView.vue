@@ -33,7 +33,10 @@
               @keydown.ctrl.enter="send"
             />
             <div class="composer-actions">
-              <span class="hint">依据顶栏「当前手册」中已上线的内容回答</span>
+              <span class="hint">
+                依据顶栏所选「问答知识库」中<strong>已上线</strong>的条目回答
+                <template v-if="documentId">（{{ documentTitle || documentId }}）</template>
+              </span>
               <el-button type="primary" :loading="loading" @click="send">发送</el-button>
             </div>
           </div>
@@ -138,7 +141,7 @@ import { T } from "@/constants/terminology";
 import { chatStream, type ChatTraceEvent } from "@/api/client";
 import { useDocumentId } from "@/composables/useDocumentId";
 
-const { documentId } = useDocumentId();
+const { documentId, documentTitle } = useDocumentId();
 const question = ref("");
 const loading = ref(false);
 const messages = ref<
@@ -330,6 +333,10 @@ async function scrollMessages() {
 async function send() {
   const q = question.value.trim();
   if (!q || loading.value) return;
+  if (!documentId.value.trim()) {
+    ElMessage.warning(T.chatKbPlaceholder);
+    return;
+  }
   messages.value.push({ role: "user", content: q });
   question.value = "";
   loading.value = true;

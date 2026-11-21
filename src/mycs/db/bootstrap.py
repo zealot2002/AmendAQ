@@ -7,6 +7,7 @@ from mycs.db.connection import connect, get_db_path
 from mycs.log import get_logger
 from mycs.db.catalog_mode import migrate_kg_document_catalog_mode
 from mycs.db.schema_kg import KG_DDL
+from mycs.db.schema_kb import KB_DDL
 from mycs.db.schema_wiki_toc import WIKI_TOC_DDL
 from mycs.graph.extract import SectionGraphBuilder
 from mycs.graph.persist import export_graph_json, persist_graph
@@ -43,6 +44,16 @@ def bootstrap_database(db_path: Path | None = None) -> Path:
         conn.close()
     logger.info("database ready at %s", path)
     return path
+
+
+def _migrate_kb_section_ref(conn) -> None:
+    rows = conn.execute("PRAGMA table_info(kb_faq_item)").fetchall()
+    if not rows:
+        return
+    if not any(str(r[1]) == "section_ref" for r in rows):
+        conn.execute(
+            "ALTER TABLE kb_faq_item ADD COLUMN section_ref TEXT NOT NULL DEFAULT ''"
+        )
 
 
 def _create_schema(conn) -> None:
@@ -88,6 +99,8 @@ def _create_schema(conn) -> None:
     conn.executescript(KG_DDL)
     migrate_kg_document_catalog_mode(conn)
     conn.executescript(WIKI_TOC_DDL)
+    conn.executescript(KB_DDL)
+    _migrate_kb_section_ref(conn)
     conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS gov_policy (

@@ -13,8 +13,10 @@ from mycs.wiki.ingest_progress import IngestProgressFn, noop_ingest_progress, re
 logger = get_logger(__name__)
 
 COMPILE_SYSTEM = (
-    "你是企业 Wiki 编译器。把杂乱 FAQ/Markdown 编成标准目录 JSON，不要 markdown 包裹。"
-    "禁止编造电话号码、政策、未出现在原文中的条款。"
+    "你是企业 Wiki / FAQ 编译器。输入可能是：FAQ Markdown、纯文本问答、或「1. 章 / 1.1 节」员工手册。"
+    "统一编成标准 FAQ 目录 JSON：模块为 chapter，每条可检索问答为 leaf（标题像问句，body 为答案全文）。"
+    "员工手册按「1.1」等各节拆成多条 leaf，标题概括该节主题；不要整章合并成一条。"
+    "不要 markdown 包裹。禁止编造原文未出现的电话、金额、政策。"
     "格式："
     '{"document":{"title":string},'
     '"chapters":[{"section_ref":"1","title":string}],'

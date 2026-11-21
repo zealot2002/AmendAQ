@@ -12,11 +12,16 @@ logger = get_logger(__name__)
 
 def list_mounts() -> dict[str, Any]:
     ensure_database()
-    svc = KnowledgeService()
+    from mycs.db.connection import connect
+    from mycs.kb.service import KbService
+
+    conn = connect()
     try:
-        return svc.wiki_list_mounts()
+        kb = KbService(conn)
+        mounts = kb.list_libraries()
+        return {"mounts": mounts, "count": len(mounts)}
     finally:
-        svc.close()
+        conn.close()
 
 
 def get_toc(document_id: str) -> dict[str, Any]:

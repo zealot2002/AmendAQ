@@ -21,10 +21,6 @@ def resolve_step_kind(step: str, payload: dict[str, Any] | None = None) -> tuple
 
     if step == "understand":
         return "llm", KIND_LABELS["llm"]
-    if step == "question_split":
-        return "llm", KIND_LABELS["llm"]
-    if step == "sub_question":
-        return "pipeline", KIND_LABELS["pipeline"]
     if step == "toc_drill":
         mode = str(p.get("mode") or "")
         if mode == "llm_pick":

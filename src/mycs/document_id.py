@@ -32,6 +32,12 @@ def generate_document_id(filename: str, conn: sqlite3.Connection | None = None) 
 
 def _document_id_taken(conn: sqlite3.Connection, document_id: str) -> bool:
     row = conn.execute(
+        "SELECT 1 FROM kb_library WHERE document_id = ? LIMIT 1",
+        (document_id,),
+    ).fetchone()
+    if row:
+        return True
+    row = conn.execute(
         "SELECT 1 FROM wiki_document_mount WHERE document_id = ? LIMIT 1",
         (document_id,),
     ).fetchone()
