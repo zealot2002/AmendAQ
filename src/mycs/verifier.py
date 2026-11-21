@@ -1,8 +1,38 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from mycs.models import VerifyResult
+
+_GENERIC_TOKENS = {
+    "员工",
+    "公司",
+    "手册",
+    "规定",
+    "具体",
+    "处理",
+    "方式",
+    "关于",
+    "如何",
+    "进行",
+    "相关",
+    "上限",
+    "金额",
+    "限制",
+    "天数",
+    "额度",
+    "适用",
+    "场景",
+    "后果",
+    "新台币",
+}
+_HYPOTHETICAL_PERMIT = re.compile(
+    r"(未造成|没有造成|若未造成|如果没有).{0,24}(可以接受|可以收取|可以收|可以同意)"
+)
+_PROHIBIT = re.compile(r"(不能|不得|禁止).{0,16}(造成|接受|收取)")
+_DENY = re.compile(r"(不能接受|不得接受|不可以接受|不能收|不得收|不可以收)")
+_OBLIGATION = re.compile(r"(必须|应当|原则上|应)")
 
 
 class Verifier:
@@ -158,6 +188,30 @@ class Verifier:
         )
         checks.append({"name": "no_faq_primary_hit", "ok": not faq_noise})
 
+        if has_knowledge:
+            evidence = _knowledge_text(entities, leaves)
+            contradicted = _contradicts_retrieved_fact(answer, evidence)
+            checks.append(
+                {
+                    "name": "conclusion_not_retracted",
+                    "ok": not contradicted,
+                }
+            )
+            invented = _obligation_then_retracted(answer, evidence)
+            checks.append(
+                {
+                    "name": "obligation_grounded",
+                    "ok": not invented,
+                }
+            )
+            permitted = _prohibition_restated_as_permission(answer, evidence)
+            checks.append(
+                {
+                    "name": "prohibition_not_restated_as_permission",
+                    "ok": not permitted,
+                }
+            )
+
         ok = all(c["ok"] for c in checks)
         return VerifyResult(
             ok=ok,
@@ -168,3 +222,79 @@ class Verifier:
 
 def _norm(text: str) -> str:
     return "".join(text.lower().split())
+
+
+def _knowledge_text(entities: list[dict[str, Any]], leaves: list[dict[str, Any]]) -> str:
+    parts: list[str] = []
+    for leaf in leaves:
+        for key in ("title", "summary", "body"):
+            parts.append(str(leaf.get(key) or ""))
+    for entity in entities:
+        for key in ("name", "summary", "body"):
+            parts.append(str(entity.get(key) or ""))
+        props = entity.get("properties") or {}
+        if isinstance(props, dict):
+            parts.append(str(props.get("body") or ""))
+    return "\n".join(part for part in parts if part.strip())
+
+
+def _content_tokens(text: str) -> set[str]:
+    tokens: set[str] = set()
+    for segment in re.findall(r"[\u4e00-\u9fff]{2,}", text or ""):
+        if len(segment) <= 6:
+            tokens.add(segment)
+        for index in range(len(segment) - 1):
+            tokens.add(segment[index : index + 2])
+    return {token for token in tokens if token not in _GENERIC_TOKENS and len(token) >= 2}
+
+
+def _public_sentences(answer: str) -> list[str]:
+    raw = answer or ""
+    marker = re.search(r"\n\s*依据[：:]", raw)
+    public = raw[: marker.start()] if marker else raw
+    return [part.strip() for part in re.split(r"[。！？\n；;]", public) if part.strip()]
+
+
+def _contradicts_retrieved_fact(answer: str, evidence: str) -> bool:
+    """已写明的事实后面又说未检索到同一件事。"""
+    evidence_tokens = _content_tokens(evidence)
+    prior: set[str] = set()
+    for sentence in _public_sentences(answer):
+        if "未检索到" in sentence or "未找到" in sentence:
+            if _content_tokens(sentence) & prior:
+                return True
+            continue
+        prior |= _content_tokens(sentence) & evidence_tokens
+    return False
+
+
+def _obligation_then_retracted(answer: str, evidence: str) -> bool:
+    """先写一条原文没有的义务，再用未检索到收回。"""
+    pending = ""
+    for sentence in _public_sentences(answer):
+        if "未检索到" in sentence or "未找到" in sentence:
+            if not pending:
+                continue
+            for span in _fourgrams(pending):
+                if span in sentence and span not in evidence:
+                    return True
+            continue
+        if _OBLIGATION.search(sentence):
+            pending = sentence
+    return False
+
+
+def _prohibition_restated_as_permission(answer: str, evidence: str) -> bool:
+    """原文是禁止，结论把条件改写成「如果没有就可以」。"""
+    if not _PROHIBIT.search(evidence or ""):
+        return False
+    if not _HYPOTHETICAL_PERMIT.search(answer or ""):
+        return False
+    return _DENY.search(answer or "") is None
+
+
+def _fourgrams(text: str) -> list[str]:
+    chars = "".join(re.findall(r"[\u4e00-\u9fff]", text or ""))
+    if len(chars) < 4:
+        return []
+    return [chars[index : index + 4] for index in range(len(chars) - 3)]

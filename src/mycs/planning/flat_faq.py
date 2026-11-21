@@ -19,6 +19,27 @@ DEFAULT_FAQ_RECALL_MAX_PICKS = 5
 DEFAULT_FAQ_RECALL_MAX_PICKS_ENUM = 24
 
 
+def faq_title_notes(
+    *,
+    enumerative_query: bool,
+    composite_query: bool,
+    pick_cap: int,
+) -> tuple[str, str]:
+    """Ordinary「通常 1～3 条」只用于单件事。多件事另有自己的上限，不再叠加上限句。"""
+    from mycs.prompts import prompt
+
+    if enumerative_query:
+        kind_note = "\n\n" + prompt("faq_title_enumerative", pick_cap=pick_cap)
+    elif composite_query:
+        kind_note = ""
+    else:
+        kind_note = "\n\n" + prompt("faq_title_ordinary", pick_cap=pick_cap)
+    composite_note = (
+        "\n\n" + prompt("faq_title_composite", pick_cap=pick_cap) if composite_query else ""
+    )
+    return kind_note, composite_note
+
+
 class FaqTitleReviewer(Protocol):
     def review_faq_title_batch(
         self,

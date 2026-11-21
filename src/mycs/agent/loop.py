@@ -388,6 +388,14 @@ class AgentLoop:
         progress("正在根据检索结果撰写回答…")
         clauses = evidence_text(context)
         active_skills = match_skills(load_skills(), understood.raw_question, clauses)
+        computed_quantity = None
+        if any(skill.name == "capped-quantity" for skill in active_skills):
+            from mycs.skills.capped_quantity import compute_capped_quantity
+
+            computed_quantity = compute_capped_quantity(understood.raw_question, clauses)
+            if computed_quantity:
+                context["computed_quantity"] = computed_quantity
+                logger.info("joyjoy: capped quantity %s", computed_quantity)
         if active_skills:
             context["skill_instructions"] = "\n\n".join(
                 f"## {skill.name}\n{skill.instructions}".strip() for skill in active_skills
@@ -423,6 +431,7 @@ class AgentLoop:
                 draft=answer,
                 evidence_text=clauses,
                 skill_instructions=str(context.get("skill_instructions") or ""),
+                computed_quantity=computed_quantity,
             )
             revise_calls = take_llm_captures()
             compose_llm_calls = compose_llm_calls + revise_calls
@@ -443,6 +452,13 @@ class AgentLoop:
             )
             if revised.strip():
                 answer = revised.strip()
+        if computed_quantity:
+            from mycs.skills.capped_quantity import apply_capped_quantity
+
+            enforced = apply_capped_quantity(answer, computed_quantity)
+            if enforced != answer:
+                logger.info("joyjoy: capped quantity enforced result=%s", computed_quantity.get("result"))
+                answer = enforced
         progress("正在核对回答是否有据…")
         verify = self._run_verify(understood, context, claims, answer=answer)
         emit(

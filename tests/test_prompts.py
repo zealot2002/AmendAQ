@@ -27,6 +27,19 @@ def test_prompt_fills_placeholders():
     assert "{{" not in text
 
 
+def test_composite_selection_does_not_add_ordinary_cap():
+    from mycs.planning.flat_faq import faq_title_notes
+
+    kind_note, composite_note = faq_title_notes(
+        enumerative_query=False,
+        composite_query=True,
+        pick_cap=5,
+    )
+    assert kind_note == ""
+    assert "每一件事" in composite_note
+    assert "通常 1～3 条" not in composite_note
+
+
 def test_capped_quantity_skill_uses_prompt_file():
     skill = next(s for s in load_skills() if s.name == "capped-quantity")
     assert "不得超过该上限" in skill.instructions

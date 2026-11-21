@@ -50,4 +50,5 @@ class AgentLLM(Protocol):
         draft: str,
         evidence_text: str,
         skill_instructions: str,
+        computed_quantity: dict[str, object] | None = None,
     ) -> str: ...

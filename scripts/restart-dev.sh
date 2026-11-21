@@ -125,7 +125,7 @@ start_api() {
   load_user_llm_env
   load_project_env
   BIND_HOST="$(resolve_bind_host)"
-  log "启动 API ${BIND_HOST}:${API_PORT} → $LOG_DIR/api.log (MYCS_LLM=${MYCS_LLM:-unset} GLM_MODEL=${GLM_MODEL:-unset} OLLAMA_MODEL=${OLLAMA_MODEL:-unset})"
+  log "启动 API ${BIND_HOST}:${API_PORT} → $LOG_DIR/api.log (MYCS_LLM=${MYCS_LLM:-unset} GLM_MODEL=${GLM_MODEL:-unset} OLLAMA_MODEL=${OLLAMA_MODEL:-unset} QWEN_MODEL=${QWEN_MODEL:-unset})"
   (
     cd "$ROOT"
     load_user_llm_env

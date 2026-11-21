@@ -247,12 +247,12 @@ class OpenAICompatLLM:
         max_picks: int = 5,
     ) -> dict[str, Any]:
         pick_cap = max(1, int(max_picks))
-        if enumerative_query:
-            enumerative_note = "\n\n" + prompt("faq_title_enumerative", pick_cap=pick_cap)
-        else:
-            enumerative_note = "\n\n" + prompt("faq_title_ordinary", pick_cap=pick_cap)
-        composite_note = (
-            "\n\n" + prompt("faq_title_composite", pick_cap=pick_cap) if composite_query else ""
+        from mycs.planning.flat_faq import faq_title_notes
+
+        enumerative_note, composite_note = faq_title_notes(
+            enumerative_query=enumerative_query,
+            composite_query=composite_query,
+            pick_cap=pick_cap,
         )
         _ = (batches_remaining, already_selected, recall_exhaustive_batches)
         system = prompt(
@@ -365,16 +365,16 @@ class OpenAICompatLLM:
 
         q = understood.raw_question or ""
         sub_qs = question_lines_for_seeding(q) if is_multi_part_question(q) else []
-        user = json.dumps(
-            {
-                "intent": understood.intent,
-                "question": q,
-                "sub_questions": sub_qs,
-                "must_answer_every_sub_question": bool(sub_qs),
-                "tool_results": slim,
-            },
-            ensure_ascii=False,
-        )
+        user_payload: dict[str, object] = {
+            "intent": understood.intent,
+            "question": q,
+            "sub_questions": sub_qs,
+            "must_answer_every_sub_question": bool(sub_qs),
+            "tool_results": slim,
+        }
+        if context.get("computed_quantity"):
+            user_payload["computed_quantity"] = context.get("computed_quantity")
+        user = json.dumps(user_payload, ensure_ascii=False)
         try:
             log_step(
                 logger,
@@ -401,17 +401,18 @@ class OpenAICompatLLM:
         draft: str,
         evidence_text: str,
         skill_instructions: str,
+        computed_quantity: dict[str, object] | None = None,
     ) -> str:
         system = prompt("revise")
-        user = json.dumps(
-            {
-                "question": question,
-                "clauses": evidence_text,
-                "skills": skill_instructions,
-                "draft": draft,
-            },
-            ensure_ascii=False,
-        )
+        payload: dict[str, object] = {
+            "question": question,
+            "clauses": evidence_text,
+            "skills": skill_instructions,
+            "draft": draft,
+        }
+        if computed_quantity:
+            payload["computed_quantity"] = computed_quantity
+        user = json.dumps(payload, ensure_ascii=False)
         text = self._text_chat(system, user).strip()
         return text or draft
 

@@ -103,7 +103,19 @@ def create_llm(backend: str | None = None) -> AgentLLM:
             trust_env=False,
         )
 
-    raise RuntimeError(f"unknown MYCS_LLM={name!r} (use openai, groq, glm, or ollama)")
+    if name == "qwen":
+        base = (os.environ.get("QWEN_BASE_URL") or "http://192.168.10.175:8000/v1").strip().rstrip("/")
+        model = os.environ.get("QWEN_MODEL") or "Qwen3.6"
+        logger.info("joyjoy: using Qwen model=%s base=%s", model, base)
+        return OpenAICompatLLM(
+            base_url=base,
+            api_key=os.environ.get("QWEN_API_KEY") or "EMPTY",
+            model=model,
+            provider="openai",
+            trust_env=False,
+        )
+
+    raise RuntimeError(f"unknown MYCS_LLM={name!r} (use glm, ollama, qwen, openai, or groq)")
 
 
 def _groq_api_key() -> str | None:
@@ -147,6 +159,8 @@ def resolve_llm_model_name(backend: str | None = None) -> str:
         return os.environ.get("OPENAI_MODEL") or "openai-compat"
     if name == "ollama":
         return os.environ.get("OLLAMA_MODEL") or "qwen2.5:7b"
+    if name == "qwen":
+        return os.environ.get("QWEN_MODEL") or "Qwen3.6"
     return "大模型"
 
 
