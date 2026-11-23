@@ -149,9 +149,9 @@ uv run python examples/eval/run_eval.py --lang zh --dry-run
 
 | # | 标题 | 内容 |
 |---|------|------|
-| 1 | [如果一条制度可以改完就生效，还要先向量化吗](https://dev.to/zealot2002/ru-guo-tiao-zhi-du-ke-yi-gai-wan-jiu-sheng-xiao-huan-yao-xian-xiang-liang-hua-ma-501b) | 为什么可修订的问答比向量切片更适合当知识单位 |
-| 2 | [AmendAQ 在 mycs 里是一本可以改的问答](https://dev.to/zealot2002/amendaq-zai-mycs-li-shi-ben-ke-yi-gai-de-wen-da-539) | 选库、只交编号、规则核对 |
-| 3 | [同题对照之后，有些场景可以选择 AmendAQ](https://dev.to/zealot2002/tong-ti-dui-zhao-zhi-hou-you-xie-chang-jing-ke-yi-xuan-ze-amendaq-1dhk) | 同一套 60 题对照传统 RAG 和 LightRAG |
+| 1 | [RAG 这六年怎么走过来的、2026 年前沿在做什么、以及它还剩哪些没解决的问题](https://dev.to/zealot2002/ru-guo-tiao-zhi-du-ke-yi-gai-wan-jiu-sheng-xiao-huan-yao-xian-xiang-liang-hua-ma-501b)（[仓库](docs/posts/01-why-amendaq.md)） | 六年 RAG、2026 前沿、制度场景五件事；AQ / AmendAQ |
+| 2 | [我们做了 AmendAQ：可改的问答，发布就是索引](https://dev.to/zealot2002/amendaq-zai-mycs-li-shi-ben-ke-yi-gai-de-wen-da-539)（[仓库](docs/posts/02-what-amendaq-is.md)） | 入库、勾编号、核对；试过又拿掉的两条路 |
+| 3 | [澄海手册对照：AmendAQ、传统 RAG 与 LightRAG](https://dev.to/zealot2002/tong-ti-dui-zhao-zhi-hou-you-xie-chang-jing-ke-yi-xuan-ze-amendaq-1dhk)（[仓库](docs/posts/03-when-to-choose-amendaq.md)） | 103×48 与 211×60 汇总表、逐题表、怎么选路线 |
 
 正文在 [docs/posts/](docs/posts/)，索引在 [docs/SERIES.md](docs/SERIES.md)。
 

@@ -150,9 +150,9 @@ The code backs the Dev.to series [AmendAQ, a better RAG?](https://dev.to/zealot2
 
 | # | Title | What it covers |
 |---|-------|----------------|
-| 1 | [如果一条制度可以改完就生效，还要先向量化吗](https://dev.to/zealot2002/ru-guo-tiao-zhi-du-ke-yi-gai-wan-jiu-sheng-xiao-huan-yao-xian-xiang-liang-hua-ma-501b) | Why a revisable Q&A row is a better unit than a vector chunk |
-| 2 | [AmendAQ 在 mycs 里是一本可以改的问答](https://dev.to/zealot2002/amendaq-zai-mycs-li-shi-ben-ke-yi-gai-de-wen-da-539) | Pick a library, return IDs, verify by rules |
-| 3 | [同题对照之后，有些场景可以选择 AmendAQ](https://dev.to/zealot2002/tong-ti-dui-zhao-zhi-hou-you-xie-chang-jing-ke-yi-xuan-ze-amendaq-1dhk) | Same 60 questions against traditional RAG and LightRAG |
+| 1 | [RAG 这六年怎么走过来的、2026 年前沿在做什么、以及它还剩哪些没解决的问题](https://dev.to/zealot2002/ru-guo-tiao-zhi-du-ke-yi-gai-wan-jiu-sheng-xiao-huan-yao-xian-xiang-liang-hua-ma-501b) ([repo](docs/posts/01-why-amendaq.md)) | Six years of RAG, 2026 frontier, vector limits on policy handbooks; AQ / AmendAQ |
+| 2 | [我们做了 AmendAQ：可改的问答，发布就是索引](https://dev.to/zealot2002/amendaq-zai-mycs-li-shi-ben-ke-yi-gai-de-wen-da-539) ([repo](docs/posts/02-what-amendaq-is.md)) | Publish gate, ID pick, verify by rules; shortcuts that did not ship |
+| 3 | [澄海手册对照：AmendAQ、传统 RAG 与 LightRAG](https://dev.to/zealot2002/tong-ti-dui-zhao-zhi-hou-you-xie-chang-jing-ke-yi-xuan-ze-amendaq-1dhk) ([repo](docs/posts/03-when-to-choose-amendaq.md)) | 103×48 and 211×60 score tables, per-question matrix, when to pick which path |
 
 Source files: [docs/posts/](docs/posts/). Index: [docs/SERIES.md](docs/SERIES.md).
 
