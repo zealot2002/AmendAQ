@@ -145,9 +145,43 @@ def test_flat_faq_single_pass_under_max(monkeypatch):
     assert flat.reason == "flat_faq_done"
 
 
+def test_faq_over_200_is_two_batches(monkeypatch):
+    monkeypatch.delenv("MYCS_FAQ_BATCH_SIZE", raising=False)
+    monkeypatch.delenv("MYCS_FAQ_SINGLE_PASS_MAX", raising=False)
+
+    class _Svc(_FakeLeavesSvc):
+        def faq_list_published_leaves(self, *, document_id: str) -> dict[str, Any]:
+            return {
+                "leaves": [
+                    {
+                        "section_ref": f"1.{i}",
+                        "title": f"条目{i}",
+                        "summary": "摘要",
+                        "node_id": f"n{i}",
+                    }
+                    for i in range(1, 212)
+                ]
+            }
+
+    sizes: list[int] = []
+
+    class _Count:
+        def review_faq_title_batch(self, **kwargs: Any) -> dict[str, Any]:
+            sizes.append(len(kwargs["entries_in_batch"]))
+            return {"section_refs": [], "reason": "none"}
+
+    run_flat_faq_recall(
+        llm=_Count(),
+        svc=_Svc(),  # type: ignore[arg-type]
+        document_id="faq",
+        question="任意",
+    )
+    assert sizes == [200, 11]
+
+
 def test_flat_faq_done_does_not_skip_later_slices(monkeypatch):
     monkeypatch.setenv("MYCS_FAQ_SINGLE_PASS_MAX", "8")
-    monkeypatch.setenv("MYCS_TOC_BATCH_SIZE", "4")
+    monkeypatch.setenv("MYCS_FAQ_BATCH_SIZE", "4")
     monkeypatch.setenv("MYCS_FAQ_RECALL_MAX_PICKS", "5")
 
     class _Svc(_FakeLeavesSvc):

@@ -53,6 +53,16 @@ class OpenAICompatLLM:
         else:
             self.trust_env = trust_env
         self.provider = provider or _infer_provider(self.base_url)
+        self.last_usage: dict[str, Any] = {}
+        self.usage_totals: dict[str, int] = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        }
+
+    def complete(self, system: str, user: str, *, max_tokens: int | None = None) -> str:
+        """Plain completion on this same client. Used by comparison baselines."""
+        return self._raw_chat(system, user, json_mode=False, max_tokens=max_tokens)
 
     def understand(self, question: str, case_id: str | None) -> UnderstandResult:
         system = prompt("understand")
@@ -459,6 +469,7 @@ class OpenAICompatLLM:
         if self.provider == "openai" and _env_truthy("OPENAI_ENABLE_THINKING", default=False) is False:
             body["chat_template_kwargs"] = {"enable_thinking": False}
         headers = {"Authorization": f"Bearer {self.api_key}"}
+        self.last_usage = {}
         logger.info(
             "llm chat provider=%s model=%s json=%s",
             self.provider,
@@ -489,6 +500,12 @@ class OpenAICompatLLM:
                         continue
                     resp.raise_for_status()
                     data = resp.json()
+                    usage = data.get("usage")
+                    self.last_usage = usage if isinstance(usage, dict) else {}
+                    for key in self.usage_totals:
+                        val = self.last_usage.get(key)
+                        if isinstance(val, int):
+                            self.usage_totals[key] += val
                     break
             except Exception as exc:
                 last_exc = exc

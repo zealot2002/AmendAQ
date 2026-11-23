@@ -15,7 +15,14 @@
     </div>
 
     <el-card shadow="never" class="table-card" v-loading="loading">
-      <el-table v-if="filtered.length" :data="filtered" border stripe>
+      <el-table
+        v-if="filtered.length"
+        :data="filtered"
+        border
+        stripe
+        class="library-table"
+        @row-click="onDetail"
+      >
         <el-table-column prop="title" :label="T.colLibraryName" min-width="180">
           <template #default="{ row }">
             <span class="name">{{ row.title || row.display_title || row.document_id }}</span>
@@ -34,9 +41,9 @@
         <el-table-column prop="published_leaves" :label="T.colLiveEntries" width="100" align="center" />
         <el-table-column :label="T.colActions" width="220" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button link type="primary" @click="onDetail(row)">{{ T.btnDetail }}</el-button>
-            <el-button link type="primary" @click="openEdit(row)">{{ T.btnEdit }}</el-button>
-            <el-button link type="danger" @click="onDelete(row)">{{ T.btnDelete }}</el-button>
+            <el-button link type="primary" @click.stop="onDetail(row)">{{ T.btnDetail }}</el-button>
+            <el-button link type="primary" @click.stop="openEdit(row)">{{ T.btnEdit }}</el-button>
+            <el-button link type="danger" @click.stop="onDelete(row)">{{ T.btnDelete }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -230,6 +237,9 @@ onMounted(load);
 }
 .table-card {
   background: #fff;
+}
+.library-table :deep(.el-table__row) {
+  cursor: pointer;
 }
 .name {
   font-weight: 500;

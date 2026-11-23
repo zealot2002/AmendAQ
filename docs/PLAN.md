@@ -4,7 +4,9 @@
 
 **产品定位**：泛化 **智能客服 / 公众咨询 / 办事指引** — 适用于政府、企业、学校等场景。架构不绑定「订单」；动态事实通过可插拔的 **领域状态 API** 接入（办件、工单、学籍、预约等）。
 
-## 架构原则（与 [01-rag-end-is-knowledge.md](./posts/01-rag-end-is-knowledge.md) 对齐）
+## 架构原则（与 [01-why-amendaq.md](./posts/01-why-amendaq.md) 对齐）
+
+对外系列已收成三篇，从 [01-why-amendaq.md](./posts/01-why-amendaq.md) 读起，索引在 [SERIES.md](./SERIES.md)。下面这张表仍是仓库里的目标分层。
 
 | 层 | 职责 | 本仓库实现 |
 |----|------|------------|
@@ -147,7 +149,7 @@ M6  HITL + 评测；LangGraph 可选，非必须              → 博文 07（�
 - 规则或脚本 Mock LLM，跑通闭环
 - JSON **trace** 落盘（每步 Plan / Tool / Verify）
 
-**博文** — [02-knowledge-agent-loop.md](./posts/02-knowledge-agent-loop.md)（待写）
+**博文** — 旧稿已删除。对外系列见 [SERIES.md](./SERIES.md)
 
 **常见坑（预留提纲）** — Plan 写成关键词搜索；Verify 缺失；Tool 返回与 Plan 字段不对齐；把「必须查状态」和「只查政策」混在同一模板
 
@@ -162,7 +164,7 @@ M6  HITL + 评测；LangGraph 可选，非必须              → 博文 07（�
 - Prompt 约束：先输出 Knowledge Requirement 再调 Tool
 - `joyjoy` 结构化日志
 
-**博文** — [03-ollama-and-trace-ui.md](./posts/03-ollama-and-trace-ui.md)（待写）
+**博文** — 旧稿已删除。对外系列见 [SERIES.md](./SERIES.md)
 
 **常见坑** — Tool call 不稳定、JSON 格式、小模型跳过 Verify、延迟与超时
 
@@ -177,7 +179,7 @@ M6  HITL + 评测；LangGraph 可选，非必须              → 博文 07（�
 - Knowledge API：`get_entity`、`get_attribute`、`get_policy`、`get_procedure`、`get_evidence`
 - 种子数据：示例办事指南 + 时限/条件政策（可另附 01 文电商例作对照，非硬编码域）
 
-**博文** — [04-wiki-embedded-evidence.md](./posts/04-wiki-embedded-evidence.md)（待写）
+**博文** — 旧稿已删除。对外系列见 [SERIES.md](./SERIES.md)
 
 **常见坑** — 证据与事实字段重复维护；政策版本与 `effective_from`；缺 evidence 时 Verify 策略
 
@@ -247,10 +249,9 @@ M6  HITL + 评测；LangGraph 可选，非必须              → 博文 07（�
 
 | 博文 | 里程碑 | 状态 |
 |------|--------|------|
-| [01-rag-end-is-knowledge.md](./posts/01-rag-end-is-knowledge.md) | 背景（无代码） | 已发布 |
-| 02-knowledge-agent-loop | M0 + M1 | 待写 |
-| 03-ollama-and-trace-ui | M2 | 待写 |
-| 04-wiki-embedded-evidence | M3 | 待写 |
+| [01-why-amendaq.md](./posts/01-why-amendaq.md) | 背景 | 对外系列 |
+| [02-what-amendaq-is.md](./posts/02-what-amendaq-is.md) | 当前主路径 | 对外系列 |
+| [03-when-to-choose-amendaq.md](./posts/03-when-to-choose-amendaq.md) | 对照 | 对外系列 |
 | 05-verify-without-chunk-rag | M4 | 待写 |
 | 06-mcp-knowledge-api | M5 | 待写 |
 | 07-hitl-and-eval | M6 | 待写 |
@@ -261,13 +262,10 @@ M6  HITL + 评测；LangGraph 可选，非必须              → 博文 07（�
 
 ## 当前进度
 
-- [x] 01 背景博文
+- [x] 01 背景博文（旧四篇已删除，对外系列见 [SERIES.md](./SERIES.md)）
 - [x] 计划定稿（无 chunk；泛化客服域；M1–M4 自研 Agent loop）
 - [x] M0 代码骨架
 - [x] M1 Mock Agent 闭环 + trace
-- [x] [02-knowledge-agent-loop.md](./posts/02-knowledge-agent-loop.md)
 - [x] M2 Ollama + Gradio UI
-- [x] [03-ollama-and-trace-ui.md](./posts/03-ollama-and-trace-ui.md)
 - [x] M3 Wiki ingest + handbook QA（初版）
-- [x] [04-wiki-embedded-evidence.md](./posts/04-wiki-embedded-evidence.md)
 - [ ] M4 领域状态 API 强化 …

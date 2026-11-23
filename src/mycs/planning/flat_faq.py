@@ -13,8 +13,8 @@ from mycs.ui.trace_llm_capture import take_llm_captures
 
 logger = get_logger(__name__)
 
-DEFAULT_BATCH_SIZE = 8
-DEFAULT_FAQ_SINGLE_PASS_MAX = 120
+DEFAULT_FAQ_BATCH_SIZE = 200
+DEFAULT_FAQ_SINGLE_PASS_MAX = 200
 DEFAULT_FAQ_RECALL_MAX_PICKS = 5
 DEFAULT_FAQ_RECALL_MAX_PICKS_ENUM = 24
 
@@ -67,8 +67,10 @@ class FlatFaqResult:
     reason: str = ""
 
 
-def _batch_size() -> int:
-    return max(3, int(os.environ.get("MYCS_TOC_BATCH_SIZE", str(DEFAULT_BATCH_SIZE))))
+def _faq_batch_size() -> int:
+    """超过单次上限后的标题批大小。不借用目录那一档的 8 条。"""
+    raw = os.environ.get("MYCS_FAQ_BATCH_SIZE", str(DEFAULT_FAQ_BATCH_SIZE))
+    return max(3, int(raw))
 
 
 def _faq_single_pass_max() -> int:
@@ -127,7 +129,7 @@ def _trim_faq_picks(
 def _faq_effective_batch_size(leaf_count: int) -> int:
     if leaf_count <= _faq_single_pass_max():
         return leaf_count
-    return _batch_size()
+    return _faq_batch_size()
 
 
 def _node_by_ref(nodes: list[dict[str, Any]], ref: str) -> dict[str, Any] | None:

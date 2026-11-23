@@ -1,40 +1,34 @@
-# 系列博文索引 — mycs 智能客服
+# 系列博文 — AmendAQ, a better RAG?
 
-代码与文章同仓同步。完整里程碑见 [PLAN.md](./PLAN.md)。
+代码与文章同仓。三篇讲同一件事：制度如果已经写成可以单独改的问答，提问时可以按编号取，而不必先向量化。
 
-## 产品范围
+| # | 文章 | 读完能带走的 |
+|---|------|----------------|
+| 1 | [如果一条制度可以改完就生效，还要先向量化吗](./posts/01-why-amendaq.md) | RAG 四代都在补「找不到」。向量化仍然改不动一条制度。AQ 是可修订的问答，AmendAQ 是打开某一条、改定、发布 |
+| 2 | [AmendAQ 在 mycs 里是一本可以改的问答](./posts/02-what-amendaq-is.md) | 人选库、模型只勾已发布编号、程序取正文并核对。每批最多 200 条 |
+| 3 | [同题对照之后，有些场景可以选择 AmendAQ](./posts/03-when-to-choose-amendaq.md) | 211 条、60 题：AmendAQ 55，传统 RAG 条件 A 56 / 条件 B 54，LightRAG 54 / 56。跨条目 10 道 AmendAQ 全对。更快的是传统 RAG |
 
-**泛化智能客服**：政府办事咨询、企业公众支持、学校政策问答等。核心能力是 **Knowledge Agent + 可核查答复**；**不绑定订单/电商**。动态事实（办件进度、工单状态、学籍等）通过 **可选的领域状态 API** 接入；许多场景仅依赖 Wiki 即可闭环。
+## 名词
 
-## 实现约定（全系列）
+| 词 | 含义 |
+|----|------|
+| AQ | 一条可修订、可发布、可撤回的问答。编号是地址，正文是答案，也是核对依据 |
+| AmendAQ | 这套做法的名字。修订某一条 AQ，发布后按编号作答。提问时不做向量检索 |
+| mycs | AmendAQ 的代码仓库 |
 
-- **主路径**：Knowledge Requirement → 结构化 Wiki +（可选）领域状态 API → Verify → Answer。
-- **证据**：Wiki 内嵌 `evidence`（原文引用 + 来源 + 生效时间），**不使用向量 chunk / RAG 检索里程碑**。
-- **演示域**：默认 Reference 场景为办事/政策咨询 + 可选 `case_id`；[01](./posts/01-rag-end-is-knowledge.md) 中的 iPhone/订单叙事仅为理论举例。
-- **Agent 编排**：**M1–M4 自研 `AgentLoop`**，不依赖 LangGraph / LangChain；trace 与 `KnowledgeRequirement` / `Verifier` 边界见 [PLAN.md](./PLAN.md#agent-编排与框架选型)。M6 可选 LangGraph（HITL 等），非必须。
-- **日志 tag**：`joyjoy`。
+适用范围是一次一本知识库、几十到两百来条已发布问答。政府办事、企业制度、学校政策属于这个形状。百万文档搜索不走这条路径。
 
-## 文章列表
+动态事实（办件进度、工单、学籍）可以另接状态接口。许多咨询只靠 AQ 就能答完。
 
-| # | 文件 | 里程碑 | 摘要 |
-|---|------|--------|------|
-| 1 | [posts/01-rag-end-is-knowledge.md](./posts/01-rag-end-is-knowledge.md) | — | RAG 演进与企业知识 OS（理论） |
-| 2 | [posts/02-knowledge-agent-loop.md](./posts/02-knowledge-agent-loop.md) | M0–M1 | 最小 Agent 闭环（Mock LLM，泛化咨询场景） ✅ |
-| 3 | [posts/03-ollama-and-trace-ui.md](./posts/03-ollama-and-trace-ui.md) | M2 | Ollama 联调与 trace 可视化 ✅ |
-| 4 | [posts/04-wiki-embedded-evidence.md](./posts/04-wiki-embedded-evidence.md) | M3 | 员工手册 TXT→Wiki 与问答 ✅ |
-| 5 | [posts/05-verify-without-chunk-rag.md](./posts/05-verify-without-chunk-rag.md) | M4 | 政策 Verify + 可选 Case 状态 API |
-| 6 | [posts/06-mcp-knowledge-api.md](./posts/06-mcp-knowledge-api.md) | M5 | MCP 暴露 Knowledge API |
-| 7 | [posts/07-hitl-and-eval.md](./posts/07-hitl-and-eval.md) | M6 | 知识治理与评测（可选：LangGraph 迁移笔记作附录） |
+## 实现约定
 
-## 模板（新博文）
+| 正文概念 | 当前实现 |
+|----------|----------|
+| AQ | SQLite 里已发布的扁平问答。草稿不进入提问 |
+| 选择 | 模型只交编号。空列表是拒答 |
+| 证据 | 问答正文本身。核对是程序，不让模型给自己打分 |
+| 数量 | 有上限、且已有 / 新增 / 上限都对得上时，由程序算 |
 
-```markdown
-# 标题
+**不做：** 用向量库当客服主路径；用词面分或向量相似度决定找不找得到。
 
-## 目标
-## 实现
-## 遇到的问题
-## 踩坑
-## 思考与总结
-## 代码位置
-```
+日志 tag：`joyjoy`。

@@ -1,20 +1,20 @@
 # mycs
 
-**A support agent that answers from published Q&A — not from retrieved chunks.**
+**AmendAQ: a support agent that answers from published Q&A you can revise one row at a time — not from retrieved chunks.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](pyproject.toml)
-[![Dev.to series](https://img.shields.io/badge/Dev.to-%22RAG%20%E7%9A%84%E7%BB%88%E7%82%B9%E6%98%AF%E7%9F%A5%E8%AF%86%22-blue)](https://dev.to/zealot2002/series/47162)
+[![Dev.to series](https://img.shields.io/badge/Dev.to-AmendAQ-blue)](https://dev.to/zealot2002/series/47234)
 
-You choose a knowledge base. The model only ticks published item IDs from the title list. It must write the answer from those full texts. A rule-based verifier — not another model call — rejects replies that invent obligations or contradict the source.
+You choose a knowledge base. The model only ticks published item IDs from the title list. It must write the answer from those full texts. A rule-based verifier — not another model call — rejects replies that invent obligations or contradict the source. Changing one rule means editing that published row. The next question reads the new text. There is no re-embed step.
 
-This is the runnable slice of a larger idea: RAG should end in knowledge, not in better search. The long-term shape (wiki, state APIs, knowledge requirements) is documented below. What you can run today is the path in the Dev.to series [RAG 的终点是知识](https://dev.to/zealot2002/series/47162): pick a library, select IDs, verify by rules.
+This is the runnable slice of a larger idea: RAG should end in knowledge, not in better search. The long-term shape (wiki, state APIs, knowledge requirements) is documented below. What you can run today is [AmendAQ, a better RAG?](https://dev.to/zealot2002/series/47234): pick a library, select IDs, verify by rules.
 
 [中文说明](README.zh-CN.md)
 
 ## Why this is not another RAG
 
-| | Chunk + vector + generate | mycs (published FAQ + ID selection + rule verify) |
+| | Chunk + vector + generate | AmendAQ (published FAQ + ID selection + rule verify) |
 |---|---|---|
 | Source | Raw text chunks | Published FAQ items with full answers |
 | Retrieval | Vector similarity / hybrid search | LLM reads the title list and returns only IDs |
@@ -28,7 +28,7 @@ The Vue admin UI includes a process panel on the right side of the chat page tha
 
 ![Process panel](docs/images/process-panel-devto.png)
 
-> This is a real capture from the [Dev.to series](https://dev.to/zealot2002/series/47162). It shows the older Xinghe demo data, but the visible workflow is the same one this repo runs today: skip understand, batch-select FAQ IDs, load full texts, verify by rules.
+> This is a real capture from an earlier demo. It shows the older Xinghe data, but the visible workflow is the same one this repo runs today: skip understand, batch-select FAQ IDs, load full texts, verify by rules.
 
 ## Quick start (Vue / mycs-api path)
 
@@ -86,7 +86,7 @@ The CLI path is advanced; the Vue UI is the recommended first entry.
 ## How it actually works
 
 1. **Pick a knowledge base.** When a document is selected in the UI, the agent skips the generic "understand" model call because the user already chose the context.
-2. **List published titles.** All `published` FAQ items in that library are loaded. If the count is below `MYCS_FAQ_SINGLE_PASS_MAX` (default 120), the whole title list is sent to the model at once.
+2. **List published titles.** All `published` FAQ items in that library are loaded. If the count is at or below `MYCS_FAQ_SINGLE_PASS_MAX` (default 200), the whole title list is sent to the model at once. Above that, titles go out in batches of `MYCS_FAQ_BATCH_SIZE` (default 200), and every batch is scanned.
 3. **Model returns IDs only.** The model is asked to return only `section_refs` that match the question. IDs that are not in the list are discarded.
 4. **Load full texts.** The agent reads the full answer text for each selected ID.
 5. **Compose from source.** The model writes the final answer using only those full texts.
@@ -107,7 +107,9 @@ It imports the fictional **Stellar Systems Demo** FAQ from `examples/demo/`, run
 uv run python examples/eval/run_eval.py --dry-run
 ```
 
-The original **Xinghe 13-question benchmark** discussed in the blog is **still not reproducible from this repo**:
+The Chenghai handbook comparison (211 published Q&A, 60 questions, same `Qwen3.6` for mycs, a fixed traditional RAG pipeline, and LightRAG) is written up in [docs/posts/03-when-to-choose-amendaq.md](docs/posts/03-when-to-choose-amendaq.md). Reproduce it with `scripts/run_compare.py`. On condition A, scores were AmendAQ 55/60, traditional RAG 56/60, LightRAG 54/60. The 10 questions that need two or more entries were 10/10 for AmendAQ. Traditional RAG was faster (median 7.6s vs 21.2s).
+
+The original **Xinghe 13-question benchmark** is **still not reproducible from this repo**:
 
 - `scripts/run_xinghe_eval.py` only contains 10 questions, not 13, and now carries a clear header note.
 - The source handbook file (`docs/星河科技_中文员工手册_知识库测试.txt`) is missing, so the script cannot re-ingest the evaluated document.
@@ -119,7 +121,7 @@ The original **Xinghe 13-question benchmark** discussed in the blog is **still n
 ### Current limits
 
 - **Not general vector RAG.** The main path is intentionally a published-FAQ pipeline, not open-domain retrieval.
-- **Scale:** Sending all published titles at once fits tens to low-hundreds of items. It is not a million-document search engine.
+- **Scale:** Sending published titles in batches of 200 fits tens to low hundreds of items. It is not a million-document search engine.
 - **Verification:** Counts and obligations are rule-checked, but the current rules can still be too strict (false rejections) or miss some paraphrased contradictions.
 - **Tree descent:** `wiki.toc.*` and `kg_*` code paths still exist but are not the main path used by the Vue UI.
 
@@ -144,16 +146,15 @@ The original **Xinghe 13-question benchmark** discussed in the blog is **still n
 
 ## Blog series
 
-The code backs the Dev.to series [RAG 的终点是知识](https://dev.to/zealot2002/series/47162).
+The code backs the Dev.to series [AmendAQ, a better RAG?](https://dev.to/zealot2002/series/47234).
 
 | # | Title | What it covers |
 |---|-------|----------------|
-| 1 | [RAG 的终点不是检索，而是知识](https://dev.to/zealot2002/rag-de-zhong-dian-bu-shi-jian-suo-er-shi-zhi-shi-550f) | From chunk retrieval to a persistent knowledge layer |
-| 2 | [知识库既已选定，就别再让模型做意图分类](https://dev.to/zealot2002/zhi-shi-ku-ding-liao-jiu-bie-zai-rang-mo-xing-cai-ni-zai-wen-shi-yao-3bgh) | Skip understand, read the whole title list, return IDs |
-| 3 | [三个模型只改一个变量：7B 读标题花了 27 秒](https://dev.to/zealot2002/san-ge-mo-xing-zhi-gai-ge-bian-liang-45jm) | Switching backends, cost of reading titles, comparing results |
-| 4 | [答复能不能发出去，别再问模型自己对不对](https://dev.to/zealot2002/wen-da-shi-bian-ping-de-xian-fa-bu-zai-rang-mo-xing-kan-jian-2i1i) | Publish gate, compose rules, deterministic verification |
+| 1 | [如果一条制度可以改完就生效，还要先向量化吗](https://dev.to/zealot2002/ru-guo-tiao-zhi-du-ke-yi-gai-wan-jiu-sheng-xiao-huan-yao-xian-xiang-liang-hua-ma-501b) | Why a revisable Q&A row is a better unit than a vector chunk |
+| 2 | [AmendAQ 在 mycs 里是一本可以改的问答](https://dev.to/zealot2002/amendaq-zai-mycs-li-shi-ben-ke-yi-gai-de-wen-da-539) | Pick a library, return IDs, verify by rules |
+| 3 | [同题对照之后，有些场景可以选择 AmendAQ](https://dev.to/zealot2002/tong-ti-dui-zhao-zhi-hou-you-xie-chang-jing-ke-yi-xuan-ze-amendaq-1dhk) | Same 60 questions against traditional RAG and LightRAG |
 
-The files under `docs/posts/02-04.md` are unpublished / old outlines. They are **not** the published articles above.
+Source files: [docs/posts/](docs/posts/). Index: [docs/SERIES.md](docs/SERIES.md).
 
 ## License and contributing
 

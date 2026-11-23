@@ -27,14 +27,7 @@
           :placeholder="T.searchFaq"
         />
       </div>
-      <el-table
-        v-if="filteredItems.length"
-        :data="filteredItems"
-        border
-        stripe
-        max-height="520"
-        @row-click="(row: FaqItem) => openItemDialog(row)"
-      >
+      <el-table v-if="filteredItems.length" :data="filteredItems" border stripe max-height="520">
         <el-table-column type="index" width="50" align="center" />
         <el-table-column :label="T.faqQuestion" min-width="200" show-overflow-tooltip>
           <template #default="{ row }">{{ row.question }}</template>
@@ -49,8 +42,9 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column :label="T.colActions" width="120" align="center" fixed="right">
+        <el-table-column :label="T.colActions" width="140" align="center" fixed="right">
           <template #default="{ row }">
+            <el-button link type="primary" @click.stop="openItemDialog(row)">{{ T.btnEdit }}</el-button>
             <el-button link type="danger" @click.stop="removeItem(row)">{{ T.btnDelete }}</el-button>
           </template>
         </el-table-column>
