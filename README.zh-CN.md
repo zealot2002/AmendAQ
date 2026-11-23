@@ -106,7 +106,7 @@ uv run python examples/eval/run_eval.py --lang zh
 uv run python examples/eval/run_eval.py --lang zh --dry-run
 ```
 
-澄海手册对照（211 条已发布问答、60 题，同一 `Qwen3.6`，对照一条固定的传统 RAG 和 LightRAG）写在 [docs/posts/03-when-to-choose-amendaq.md](docs/posts/03-when-to-choose-amendaq.md)。复现入口是 `scripts/run_compare.py`。条件 A 的分数是 AmendAQ 55/60、传统 RAG 56/60、LightRAG 54/60。必须跨两条以上的 10 道，AmendAQ 是 10/10。传统 RAG 更快，单题中位 7.6 秒，AmendAQ 是 21.2 秒。
+澄海手册对照（211 条已发布问答、60 题，同一 `Qwen3.6`，对照一条固定的传统 RAG 和 LightRAG）写在 [docs/posts/03-when-to-choose-amendaq.md](docs/posts/03-when-to-choose-amendaq.md)。公开语料：[测试知识库原文](docs/对比测试_澄海手册_知识库.md)（[源手册正文](docs/对比测试_澄海手册_知识库.md#源手册正文)、[已发布问答](docs/对比测试_澄海手册_知识库.md#已发布问答)）与 [60 题题干与标准答案](docs/对比测试_澄海手册_题目.md)。复现入口是 `scripts/run_compare.py`。条件 A 的分数是 AmendAQ 55/60、传统 RAG 56/60、LightRAG 54/60。必须跨两条以上的 10 道，AmendAQ 是 10/10。传统 RAG 更快，单题中位 7.6 秒，AmendAQ 是 21.2 秒。
 
 原始 **星河 13 题评测在当前仓库仍然无法复现**：
 
