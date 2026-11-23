@@ -1,8 +1,8 @@
 import sqlite3
 
-from mycs.db.schema_kb import KB_DDL
-from mycs.db.schema_kg import KG_DDL
-from mycs.kb.service import KbService
+from amendaq.db.schema_kb import KB_DDL
+from amendaq.db.schema_kg import KG_DDL
+from amendaq.kb.service import KbService
 
 
 def _mem_conn() -> sqlite3.Connection:

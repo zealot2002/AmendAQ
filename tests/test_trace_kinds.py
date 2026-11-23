@@ -1,4 +1,4 @@
-from mycs.ui.trace_kinds import resolve_step_kind
+from amendaq.ui.trace_kinds import resolve_step_kind
 
 
 def test_plan_comprehensive_is_pipeline_not_llm():

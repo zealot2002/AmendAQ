@@ -1,4 +1,4 @@
-from mycs.document_id import generate_document_id
+from amendaq.document_id import generate_document_id
 
 
 def test_generate_ascii_slug():

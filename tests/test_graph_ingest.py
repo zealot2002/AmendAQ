@@ -1,8 +1,8 @@
-from mycs.db.bootstrap import bootstrap_database, ensure_schema
-from mycs.db.connection import connect
-from mycs.graph.extract import SectionGraphBuilder, ingest_txt_file
-from mycs.knowledge.service import KnowledgeService
-from mycs.wiki.ingest import policies_from_text
+from amendaq.db.bootstrap import bootstrap_database, ensure_schema
+from amendaq.db.connection import connect
+from amendaq.graph.extract import SectionGraphBuilder, ingest_txt_file
+from amendaq.knowledge.service import KnowledgeService
+from amendaq.wiki.ingest import policies_from_text
 
 
 def test_policies_from_chinese_sections():
@@ -27,7 +27,7 @@ def test_section_graph_and_search(tmp_path):
 
     import os
 
-    os.environ["MYCS_DB"] = str(db)
+    os.environ["AMENDAQ_DB"] = str(db)
     ingest_txt_file(src, document_id="sample", use_section_builder=True)
     svc = KnowledgeService(connect(db))
     try:
@@ -40,7 +40,7 @@ def test_section_graph_and_search(tmp_path):
 
 
 def test_bootstrap_loads_handbook_graph(tmp_path):
-    db = tmp_path / "mycs.db"
+    db = tmp_path / "amendaq.db"
     bootstrap_database(db)
     conn = connect(db)
     try:

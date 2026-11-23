@@ -1,10 +1,10 @@
 #!/usr/bin/env -S uv run python
-"""Compare mycs with a locked traditional RAG pipeline on one policy handbook.
+"""Compare AmendAQ with a locked traditional RAG pipeline on one policy handbook.
 
 Examples:
   uv run python scripts/run_compare.py
   uv run python scripts/run_compare.py --limit 2
-  uv run python scripts/run_compare.py --systems mycs,traditional,lightrag
+  uv run python scripts/run_compare.py --systems AmendAQ,traditional,lightrag
 """
 
 from __future__ import annotations
@@ -19,24 +19,24 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from mycs.env_loader import load_project_dotenv  # noqa: E402
+from amendaq.env_loader import load_project_dotenv  # noqa: E402
 
 load_project_dotenv()
 os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
-from mycs.compare.corpus import TITLE, iter_faqs, render_faq, render_source  # noqa: E402
-from mycs.compare.lightrag_baseline import available as lightrag_available  # noqa: E402
-from mycs.compare.prepare import build_faq_db  # noqa: E402
-from mycs.compare.questions import QUESTIONS  # noqa: E402
-from mycs.compare.report import render_report  # noqa: E402
-from mycs.compare.score import score_answer, summarize  # noqa: E402
-from mycs.compare.traditional import pipeline_lock  # noqa: E402
-from mycs.llm.factory import create_llm, resolve_llm_model_name  # noqa: E402
+from amendaq.compare.corpus import TITLE, iter_faqs, render_faq, render_source  # noqa: E402
+from amendaq.compare.lightrag_baseline import available as lightrag_available  # noqa: E402
+from amendaq.compare.prepare import build_faq_db  # noqa: E402
+from amendaq.compare.questions import QUESTIONS  # noqa: E402
+from amendaq.compare.report import render_report  # noqa: E402
+from amendaq.compare.score import score_answer, summarize  # noqa: E402
+from amendaq.compare.traditional import pipeline_lock  # noqa: E402
+from amendaq.llm.factory import create_llm, resolve_llm_model_name  # noqa: E402
 
 OUT_DIR = ROOT / "data" / "eval" / "compare"
-DB_PATH = OUT_DIR / "mycs.db"
+DB_PATH = OUT_DIR / "amendaq.db"
 REPORT_PATH = ROOT / "docs" / "对比测试_澄海手册.md"
 RESULT_PATH = OUT_DIR / "results.json"
 
@@ -44,7 +44,7 @@ RESULT_PATH = OUT_DIR / "results.json"
 def main() -> int:
     global OUT_DIR, DB_PATH, REPORT_PATH, RESULT_PATH
     parser = argparse.ArgumentParser()
-    parser.add_argument("--systems", default="mycs,traditional")
+    parser.add_argument("--systems", default="AmendAQ,traditional")
     parser.add_argument("--lightrag-condition", default="faq,source")
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--resume", action="store_true")
@@ -55,7 +55,7 @@ def main() -> int:
         OUT_DIR = Path(args.out_dir)
         if not OUT_DIR.is_absolute():
             OUT_DIR = ROOT / OUT_DIR
-        DB_PATH = OUT_DIR / "mycs.db"
+        DB_PATH = OUT_DIR / "amendaq.db"
         RESULT_PATH = OUT_DIR / "results.json"
     if args.report:
         REPORT_PATH = Path(args.report)
@@ -68,9 +68,9 @@ def main() -> int:
     started = time.perf_counter()
     document_id = build_faq_db(DB_PATH)
     index_s = round(time.perf_counter() - started, 3)
-    os.environ["MYCS_DB"] = str(DB_PATH)
-    os.environ["MYCS_GRAPH_DOCUMENT"] = document_id
-    os.environ["MYCS_CHAT_SHOW_EVIDENCE"] = "0"
+    os.environ["AMENDAQ_DB"] = str(DB_PATH)
+    os.environ["AMENDAQ_GRAPH_DOCUMENT"] = document_id
+    os.environ["AMENDAQ_CHAT_SHOW_EVIDENCE"] = "0"
     print(
         f"joyjoy: compare doc={document_id} faqs={len(iter_faqs())} questions={len(questions)} systems={systems}",
         flush=True,
@@ -86,8 +86,8 @@ def main() -> int:
     payload["lock"] = pipeline_lock()
     payload["title"] = TITLE
 
-    if "mycs" in systems:
-        _run_mycs(payload, questions)
+    if "amendaq" in systems:
+        _run_amendaq(payload, questions)
     if "traditional" in systems:
         _run_traditional(payload, questions)
     if "lightrag" in systems:
@@ -107,12 +107,12 @@ def main() -> int:
     return 0
 
 
-def _run_mycs(payload: dict, questions: list[dict]) -> None:
-    from mycs.agent.loop import AgentLoop
+def _run_amendaq(payload: dict, questions: list[dict]) -> None:
+    from amendaq.agent.loop import AgentLoop
 
     block = payload["systems"].setdefault(
-        "mycs",
-        {"label": "mycs", "conditions": {}},
+        "amendaq",
+        {"label": "AmendAQ", "conditions": {}},
     )
     done = {row["id"] for row in block.get("_rows", [])}
     llm = create_llm()
@@ -122,7 +122,7 @@ def _run_mycs(payload: dict, questions: list[dict]) -> None:
     for index, spec in enumerate(questions, start=1):
         if spec["id"] in done:
             continue
-        print(f"joyjoy: mycs {index}/{len(questions)} {spec['id']}", flush=True)
+        print(f"joyjoy: AmendAQ {index}/{len(questions)} {spec['id']}", flush=True)
         started = time.perf_counter()
         before = dict(llm.usage_totals)
         try:
@@ -134,7 +134,7 @@ def _run_mycs(payload: dict, questions: list[dict]) -> None:
             answer = ""
             error = str(exc)
             llm_calls = 0
-            print(f"joyjoy: mycs error {spec['id']}: {exc}", flush=True)
+            print(f"joyjoy: AmendAQ error {spec['id']}: {exc}", flush=True)
         elapsed = round(time.perf_counter() - started, 3)
         after = llm.usage_totals
         scored = score_answer(answer, spec)
@@ -157,10 +157,10 @@ def _run_mycs(payload: dict, questions: list[dict]) -> None:
         )
         block["_rows"] = rows
         _write_partial(payload)
-    _publish_mycs(block, payload["index_s"])
+    _publish_amendaq(block, payload["index_s"])
 
 
-def _publish_mycs(block: dict, index_s: float) -> None:
+def _publish_amendaq(block: dict, index_s: float) -> None:
     rows = block.get("_rows", [])
     cost = _cost(rows, index_s=index_s, index_llm_calls=0)
     view = {"summary": summarize(rows), "cost": cost, "rows": _public_rows(rows)}
@@ -168,7 +168,7 @@ def _publish_mycs(block: dict, index_s: float) -> None:
 
 
 def _run_traditional(payload: dict, questions: list[dict]) -> None:
-    from mycs.compare.traditional import TraditionalRAG
+    from amendaq.compare.traditional import TraditionalRAG
 
     block = payload["systems"].setdefault(
         "traditional",
@@ -232,7 +232,7 @@ def _run_lightrag(payload: dict, questions: list[dict], conditions: list[str] | 
         payload["lightrag_skipped"] = reason
         print(f"joyjoy: skip lightrag {reason}", flush=True)
         return
-    from mycs.compare.lightrag_baseline import LightRAGBaseline
+    from amendaq.compare.lightrag_baseline import LightRAGBaseline
 
     payload.pop("lightrag_skipped", None)
     block = payload["systems"].setdefault(
@@ -308,9 +308,9 @@ def _run_lightrag(payload: dict, questions: list[dict], conditions: list[str] | 
 
 
 def _finalize(payload: dict) -> None:
-    mycs = payload["systems"].get("mycs")
-    if mycs and mycs.get("_rows") and "faq" not in mycs.get("conditions", {}):
-        _publish_mycs(mycs, payload.get("index_s") or 0)
+    block = payload["systems"].get("amendaq")
+    if block and block.get("_rows") and "faq" not in block.get("conditions", {}):
+        _publish_amendaq(block, payload.get("index_s") or 0)
 
 
 def _public_rows(rows: list[dict]) -> list[dict]:

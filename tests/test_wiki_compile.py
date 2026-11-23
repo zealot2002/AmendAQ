@@ -2,14 +2,14 @@ from pathlib import Path
 
 import pytest
 
-from mycs.wiki.canonical import (
+from amendaq.wiki.canonical import (
     WikiCanonicalDraft,
     canonical_to_outline_roots,
     leaf_evidence_quotes,
     validate_canonical,
 )
-from mycs.wiki.compile import compile_faq_markdown_rules, compile_wiki_draft
-from mycs.wiki.ingest_contract import enforce_faq_contract, validate_faq_markdown_contract
+from amendaq.wiki.compile import compile_faq_markdown_rules, compile_wiki_draft
+from amendaq.wiki.ingest_contract import enforce_faq_contract, validate_faq_markdown_contract
 
 HAOSHI_FAQ = Path("/Users/zzy/Desktop/智能客服FAQ问题列表.md")
 
@@ -76,7 +76,7 @@ def test_faq_contract_rejects_informal_headings():
 
 
 def test_handbook_contract_rejects_faq_plain_txt():
-    from mycs.ui.ingest_document import ingest_document_file
+    from amendaq.ui.ingest_document import ingest_document_file
     import tempfile
 
     with tempfile.NamedTemporaryFile(suffix=".txt", mode="w", encoding="utf-8", delete=False) as f:

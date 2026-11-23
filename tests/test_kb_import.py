@@ -1,4 +1,4 @@
-from mycs.kb.import_parse import parse_faq_import_text
+from amendaq.kb.import_parse import parse_faq_import_text
 
 
 def test_parse_qna_pairs():

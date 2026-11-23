@@ -1,4 +1,4 @@
-from mycs.skills.loader import AnswerSkill, load_skills, match_skills
+from amendaq.skills.loader import AnswerSkill, load_skills, match_skills
 
 
 def _skill(**kwargs) -> AnswerSkill:

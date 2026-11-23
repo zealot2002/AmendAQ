@@ -1,4 +1,4 @@
-from mycs.skills.capped_quantity import apply_capped_quantity, compute_capped_quantity
+from amendaq.skills.capped_quantity import apply_capped_quantity, compute_capped_quantity
 
 _LEAVE = (
     "每满一个完整工作年度，享有 15 天带薪年假；1–2 天年假至少提前 3 个工作日申请；"

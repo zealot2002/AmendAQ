@@ -1,4 +1,4 @@
-from mycs.agent.loop import understand_for_question
+from amendaq.agent.loop import understand_for_question
 
 
 class _Boom:
@@ -7,7 +7,7 @@ class _Boom:
 
 
 def test_selected_document_skips_understand(monkeypatch):
-    monkeypatch.setenv("MYCS_GRAPH_DOCUMENT", "kb_demo")
+    monkeypatch.setenv("AMENDAQ_GRAPH_DOCUMENT", "kb_demo")
     understood, invoked = understand_for_question(_Boom(), "铁王座怎么来的 CASE-2026-001", None)
     assert invoked is False
     assert understood.intent == "graph_qa"
@@ -16,11 +16,11 @@ def test_selected_document_skips_understand(monkeypatch):
 
 
 def test_missing_document_still_calls_understand(monkeypatch):
-    monkeypatch.delenv("MYCS_GRAPH_DOCUMENT", raising=False)
+    monkeypatch.delenv("AMENDAQ_GRAPH_DOCUMENT", raising=False)
 
     class _LLM:
         def understand(self, question: str, case_id: str | None):
-            from mycs.models import UnderstandResult
+            from amendaq.models import UnderstandResult
 
             return UnderstandResult(
                 case_id=case_id,

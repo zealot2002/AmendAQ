@@ -2,9 +2,9 @@ import json
 
 import pytest
 
-from mycs.llm.errors import OllamaLLMError
-from mycs.llm.ollama import OllamaLLM
-from mycs.models import UnderstandResult
+from amendaq.llm.errors import OllamaLLMError
+from amendaq.llm.ollama import OllamaLLM
+from amendaq.models import UnderstandResult
 
 
 def test_ollama_understand_parses_json():

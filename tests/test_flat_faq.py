@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from mycs.db.catalog_mode import CATALOG_FLAT_FAQ, infer_catalog_mode
-from mycs.planning.flat_faq import run_flat_faq_recall
+from amendaq.db.catalog_mode import CATALOG_FLAT_FAQ, infer_catalog_mode
+from amendaq.planning.flat_faq import run_flat_faq_recall
 
 
 class _FakeLeavesSvc:
@@ -78,7 +78,7 @@ class _CountingPickLLM:
 
 
 def test_flat_faq_skips_rerank_when_under_top_k(monkeypatch):
-    monkeypatch.setenv("MYCS_FAQ_RECALL_MAX_PICKS", "5")
+    monkeypatch.setenv("AMENDAQ_FAQ_RECALL_MAX_PICKS", "5")
 
     class _OrderedLLM:
         def review_faq_title_batch(self, **kwargs: Any) -> dict[str, Any]:
@@ -96,7 +96,7 @@ def test_flat_faq_skips_rerank_when_under_top_k(monkeypatch):
 
 
 def test_flat_faq_trims_excessive_llm_picks(monkeypatch):
-    monkeypatch.setenv("MYCS_FAQ_RECALL_MAX_PICKS", "2")
+    monkeypatch.setenv("AMENDAQ_FAQ_RECALL_MAX_PICKS", "2")
 
     class _GreedyLLM:
         def review_faq_title_batch(self, **kwargs: Any) -> dict[str, Any]:
@@ -116,7 +116,7 @@ def test_flat_faq_trims_excessive_llm_picks(monkeypatch):
 
 
 def test_flat_faq_single_pass_under_max(monkeypatch):
-    monkeypatch.setenv("MYCS_FAQ_SINGLE_PASS_MAX", "120")
+    monkeypatch.setenv("AMENDAQ_FAQ_SINGLE_PASS_MAX", "120")
 
     class _ManyLeavesSvc(_FakeLeavesSvc):
         def faq_list_published_leaves(self, *, document_id: str) -> dict[str, Any]:
@@ -146,8 +146,8 @@ def test_flat_faq_single_pass_under_max(monkeypatch):
 
 
 def test_faq_over_200_is_two_batches(monkeypatch):
-    monkeypatch.delenv("MYCS_FAQ_BATCH_SIZE", raising=False)
-    monkeypatch.delenv("MYCS_FAQ_SINGLE_PASS_MAX", raising=False)
+    monkeypatch.delenv("AMENDAQ_FAQ_BATCH_SIZE", raising=False)
+    monkeypatch.delenv("AMENDAQ_FAQ_SINGLE_PASS_MAX", raising=False)
 
     class _Svc(_FakeLeavesSvc):
         def faq_list_published_leaves(self, *, document_id: str) -> dict[str, Any]:
@@ -180,9 +180,9 @@ def test_faq_over_200_is_two_batches(monkeypatch):
 
 
 def test_flat_faq_done_does_not_skip_later_slices(monkeypatch):
-    monkeypatch.setenv("MYCS_FAQ_SINGLE_PASS_MAX", "8")
-    monkeypatch.setenv("MYCS_FAQ_BATCH_SIZE", "4")
-    monkeypatch.setenv("MYCS_FAQ_RECALL_MAX_PICKS", "5")
+    monkeypatch.setenv("AMENDAQ_FAQ_SINGLE_PASS_MAX", "8")
+    monkeypatch.setenv("AMENDAQ_FAQ_BATCH_SIZE", "4")
+    monkeypatch.setenv("AMENDAQ_FAQ_RECALL_MAX_PICKS", "5")
 
     class _Svc(_FakeLeavesSvc):
         def faq_list_published_leaves(self, *, document_id: str) -> dict[str, Any]:

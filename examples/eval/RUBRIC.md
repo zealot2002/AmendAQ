@@ -25,5 +25,5 @@ This rubric is used by `run_eval.py` to score each question against the bundled 
 ## Limitations
 
 - This is a deterministic, string-based scorer. It does not judge paraphrased answers that omit the exact expected substring.
-- The evaluation requires a configured LLM backend (`MYCS_LLM` plus the matching key/base variables). Without it, the script can still do a data dry-run (`--dry-run`).
+- The evaluation requires a configured LLM backend (`AMENDAQ_LLM` plus the matching key/base variables). Without it, the script can still do a data dry-run (`--dry-run`).
 - The score is a sanity check for the published-FAQ pipeline, not a claim about general-domain RAG performance.

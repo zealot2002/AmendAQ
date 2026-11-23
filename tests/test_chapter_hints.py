@@ -1,4 +1,4 @@
-from mycs.planning.chapter_hints import (
+from amendaq.planning.chapter_hints import (
     drill_matches_seeded_chapters,
     is_composite_handbook_query,
     merged_chapter_seeds,

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from mycs.compare.chunking import chunk_chars
-from mycs.compare.corpus import faq_only_answers, iter_faqs, render_faq, render_source
-from mycs.compare.questions import QUESTIONS
-from mycs.compare.score import score_answer
-from mycs.kb.import_parse import parse_faq_import_text
+from amendaq.compare.chunking import chunk_chars
+from amendaq.compare.corpus import faq_only_answers, iter_faqs, render_faq, render_source
+from amendaq.compare.questions import QUESTIONS
+from amendaq.compare.score import score_answer
+from amendaq.kb.import_parse import parse_faq_import_text
 
 
 def test_corpus_scale_and_two_views() -> None:
@@ -82,8 +82,8 @@ def test_score_ignores_spaces_and_digit_edges() -> None:
 
 
 def test_import_publishes_every_faq(tmp_path) -> None:
-    from mycs.compare.prepare import build_faq_db
-    from mycs.db.connection import connect
+    from amendaq.compare.prepare import build_faq_db
+    from amendaq.db.connection import connect
 
     db = tmp_path / "compare.db"
     document_id = build_faq_db(db)

@@ -26,9 +26,9 @@ OUT_DIR = ROOT / "data" / "eval"
 sys.path.insert(0, str(ROOT / "src"))
 
 # These imports only touch the local SQLite layer and do not need an LLM client.
-from mycs.db.connection import connect, get_db_path
-from mycs.kb.service import KbService
-from mycs.knowledge.service import ensure_database
+from amendaq.db.connection import connect, get_db_path
+from amendaq.kb.service import KbService
+from amendaq.knowledge.service import ensure_database
 
 
 def _norm(text: str) -> str:
@@ -122,17 +122,17 @@ def main() -> int:
         return 0
 
     # These imports pull in the LLM client and its HTTP dependencies.
-    from mycs.agent.loop import AgentLoop
-    from mycs.llm.factory import create_llm
+    from amendaq.agent.loop import AgentLoop
+    from amendaq.llm.factory import create_llm
 
     try:
         llm = create_llm()
     except RuntimeError as exc:
         print(f"LLM not configured: {exc}", file=sys.stderr)
-        print("Set a provider in .env (e.g. MYCS_LLM=glm + GLM_API_KEY) and try again.", file=sys.stderr)
+        print("Set a provider in .env (e.g. AMENDAQ_LLM=glm + GLM_API_KEY) and try again.", file=sys.stderr)
         return 2
 
-    os.environ["MYCS_GRAPH_DOCUMENT"] = doc_id
+    os.environ["AMENDAQ_GRAPH_DOCUMENT"] = doc_id
     loop = AgentLoop(llm=llm)
 
     results: list[dict[str, Any]] = []
@@ -175,7 +175,7 @@ def main() -> int:
                 "ts": ts,
                 "document_id": doc_id,
                 "lang": args.lang,
-                "llm_backend": os.environ.get("MYCS_LLM", "unknown"),
+                "llm_backend": os.environ.get("AMENDAQ_LLM", "unknown"),
                 "counts": counts,
                 "results": results,
             },

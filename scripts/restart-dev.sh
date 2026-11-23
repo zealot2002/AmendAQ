@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# 一键停止并重启 mycs 开发环境（后端 API + 前端 Vite）
-# 默认监听 0.0.0.0，同一局域网同事可通过本机 IP 访问；仅本机请设 MYCS_BIND_HOST=127.0.0.1
+# 一键停止并重启 AmendAQ 开发环境（后端 API + 前端 Vite）
+# 默认监听 0.0.0.0，同一局域网同事可通过本机 IP 访问；仅本机请设 AMENDAQ_BIND_HOST=127.0.0.1
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-API_PORT="${MYCS_API_PORT:-8765}"
-WEB_PORT="${MYCS_WEB_PORT:-5180}"
-LOG_DIR="${MYCS_DEV_LOG_DIR:-$ROOT/data/dev-logs}"
+API_PORT="${AMENDAQ_API_PORT:-8765}"
+WEB_PORT="${AMENDAQ_WEB_PORT:-5180}"
+LOG_DIR="${AMENDAQ_DEV_LOG_DIR:-$ROOT/data/dev-logs}"
 PID_API="$LOG_DIR/api.pid"
 PID_WEB="$LOG_DIR/frontend.pid"
 MODE="${1:-dev}"
@@ -33,7 +33,7 @@ lan_ipv4() {
 }
 
 resolve_bind_host() {
-  printf '%s' "${MYCS_BIND_HOST:-${MYCS_API_HOST:-0.0.0.0}}"
+  printf '%s' "${AMENDAQ_BIND_HOST:-${AMENDAQ_API_HOST:-0.0.0.0}}"
 }
 
 print_access_urls() {
@@ -41,7 +41,7 @@ print_access_urls() {
   local label="${2:-页面}"
   log "本机 ${label}: http://127.0.0.1:${port}/"
   if [[ "$BIND_HOST" == "127.0.0.1" ]]; then
-    log "当前仅本机可访问（MYCS_BIND_HOST=127.0.0.1）"
+    log "当前仅本机可访问（AMENDAQ_BIND_HOST=127.0.0.1）"
     return 0
   fi
   local ip
@@ -106,12 +106,12 @@ load_project_env() {
     # shellcheck disable=SC1091
     source "$ROOT/.env"
     set +a
-    log "已加载 $ROOT/.env（覆盖 shell 中的 MYCS_LLM / GLM_*）"
+    log "已加载 $ROOT/.env（覆盖 shell 中的 AMENDAQ_LLM / GLM_*）"
   else
     if [[ -n "${GLM_API_KEY:-}${ZHIPUAI_API_KEY:-}" ]]; then
-      export MYCS_LLM=glm
+      export AMENDAQ_LLM=glm
       export GLM_MODEL="${GLM_MODEL:-glm-4-flash-250414}"
-      log "未发现 .env，但 shell 中有智谱 Key → 强制 MYCS_LLM=glm GLM_MODEL=$GLM_MODEL"
+      log "未发现 .env，但 shell 中有智谱 Key → 强制 AMENDAQ_LLM=glm GLM_MODEL=$GLM_MODEL"
     else
       log "未发现 $ROOT/.env，可 cp .env.example .env 并填写 GLM_API_KEY"
     fi
@@ -125,14 +125,14 @@ start_api() {
   load_user_llm_env
   load_project_env
   BIND_HOST="$(resolve_bind_host)"
-  log "启动 API ${BIND_HOST}:${API_PORT} → $LOG_DIR/api.log (MYCS_LLM=${MYCS_LLM:-unset} GLM_MODEL=${GLM_MODEL:-unset} OLLAMA_MODEL=${OLLAMA_MODEL:-unset} QWEN_MODEL=${QWEN_MODEL:-unset})"
+  log "启动 API ${BIND_HOST}:${API_PORT} → $LOG_DIR/api.log (AMENDAQ_LLM=${AMENDAQ_LLM:-unset} GLM_MODEL=${GLM_MODEL:-unset} OLLAMA_MODEL=${OLLAMA_MODEL:-unset} QWEN_MODEL=${QWEN_MODEL:-unset})"
   (
     cd "$ROOT"
     load_user_llm_env
     load_project_env
-    export MYCS_API_HOST="${MYCS_API_HOST:-$BIND_HOST}"
-    export MYCS_API_PORT="$API_PORT"
-    exec uv run mycs-api
+    export AMENDAQ_API_HOST="${AMENDAQ_API_HOST:-$BIND_HOST}"
+    export AMENDAQ_API_PORT="$API_PORT"
+    exec uv run amendaq-api
   ) >>"$LOG_DIR/api.log" 2>&1 &
   echo $! >"$PID_API"
 }
@@ -146,8 +146,8 @@ start_web_dev() {
   log "启动 Vite ${BIND_HOST}:${WEB_PORT} → $LOG_DIR/frontend.log"
   (
     cd "$ROOT/frontend"
-    export MYCS_WEB_PORT="$WEB_PORT"
-    export MYCS_API_PORT="$API_PORT"
+    export AMENDAQ_WEB_PORT="$WEB_PORT"
+    export AMENDAQ_API_PORT="$API_PORT"
     exec npm run dev -- --host "$BIND_HOST" --port "$WEB_PORT"
   ) >>"$LOG_DIR/frontend.log" 2>&1 &
   echo $! >"$PID_WEB"
@@ -175,7 +175,7 @@ wait_http() {
   return 1
 }
 
-log "=== mycs 开发环境重启 (mode=${MODE}) ==="
+log "=== AmendAQ 开发环境重启 (mode=${MODE}) ==="
 stop_all
 load_user_llm_env
 load_project_env
@@ -205,7 +205,7 @@ case "$MODE" in
     echo "用法: $0 [dev|prod]" >&2
     echo "  dev  — API + Vite（默认，同事访问 Vite 端口）" >&2
     echo "  prod — npm build 后仅 API 托管 dist（同事访问 API 端口）" >&2
-    echo "  仅本机在 .env 设 MYCS_BIND_HOST=127.0.0.1" >&2
+    echo "  仅本机在 .env 设 AMENDAQ_BIND_HOST=127.0.0.1" >&2
     exit 1
     ;;
 esac

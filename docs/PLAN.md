@@ -1,4 +1,4 @@
-# mycs 智能客服 — 里程碑计划
+# AmendAQ 智能客服 — 里程碑计划
 
 优先 **把理想架构跑通**（SQLite 知识库 + 缺口驱动 Plan）；博文可后补，不与里程碑强绑定。
 
@@ -12,7 +12,7 @@
 |----|------|------------|
 | LLM | 推理、规划、生成回复 | Ollama（OpenAI 兼容 API）或可切换云端 |
 | Agent | Knowledge Requirement 驱动闭环 | Understand → Plan → Tools → Verify → Answer |
-| Wiki | 结构化机构知识 | **SQLite**（`data/mycs.db`）：政策条目 + tag 目录 + **内嵌 evidence** |
+| Wiki | 结构化机构知识 | **SQLite**（`data/amendaq.db`）：政策条目 + tag 目录 + **内嵌 evidence** |
 | DB/API | **动态事实 / 办事状态**（按领域可选） | FastAPI + SQLite；示例适配器：`Case`（办件/工单/申请） |
 | 证据 | 为何相信某条事实 | **Wiki 内 `evidence`（quote + source + 生效时间）**，不用向量 chunk |
 | MCP | 对外暴露 Knowledge API | 后期里程碑 |
@@ -100,12 +100,12 @@ flowchart TB
 | 项 | 约定 |
 |----|------|
 | 技能文件 | 每个技能一个目录，内含 `SKILL.md`（frontmatter + 说明正文） |
-| 加载顺序 | 内置 `src/mycs/skills/packs/` → 仓库 `skills/` → `MYCS_SKILLS_DIR`；同名以后加载的为准 |
+| 加载顺序 | 内置 `src/amendaq/skills/packs/` → 仓库 `skills/` → `AMENDAQ_SKILLS_DIR`；同名以后加载的为准 |
 | `question_any` | 问题里命中任一词 |
 | `evidence_any` | 已检索条款里命中任一词 |
 | 两边都写了 | 必须同时命中才启用 |
 | 两边都空 | 不自动启用 |
-| 代码 | `src/mycs/skills/loader.py` 加载与匹配；`src/mycs/agent/loop.py` 只调用插槽 |
+| 代码 | `src/amendaq/skills/loader.py` 加载与匹配；`src/amendaq/agent/loop.py` 只调用插槽 |
 
 内置示例 `capped-quantity`：条款同时给出新增数量和上限时，结论为「已有数量 + 新增数量，且不得超过上限」。年假结转只是它的一个命中场景，不是代码分支。
 
@@ -129,7 +129,7 @@ M6  HITL + 评测；LangGraph 可选，非必须              → 博文 07（�
 
 **交付**
 
-- 目录约定：`src/mycs/`、`tests/`、`data/`、`docs/posts/`
+- 目录约定：`src/amendaq/`、`tests/`、`data/`、`docs/posts/`
 - `pyproject.toml`、`.env.example`、Ollama 连通性检查脚本
 - `docs/SERIES.md` 与本文 maintained
 

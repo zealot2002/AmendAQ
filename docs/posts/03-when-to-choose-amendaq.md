@@ -22,9 +22,9 @@
 完整索引见 [测试知识库原文](../对比测试_澄海手册_知识库.md) 文首说明。
 
 - **语料**：虚构《澄海精密员工手册》，上表两份正文来自同一对照包。跑了两档：**103 条已发布问答 / 48 题**；**211 条 / 60 题**（含 10 道必须同时跨两条以上 AQ 的题）。  
-- **生成模型**：三家统一 `Qwen3.6`（AmendAQ 走 mycs 已支持接口）。  
+- **生成模型**：三家统一 `Qwen3.6`（AmendAQ 已支持接口）。  
 - **判分**：程序核对义务、数字、拒答、不编造；不让模型自评。  
-- **AmendAQ**：表中 **mycs** 列；始终用**整理后的已发布词条**（条件 B 也不改语料）。  
+- **AmendAQ**：表中 **AmendAQ** 列；始终用**整理后的已发布词条**（条件 B 也不改语料）。  
 - **传统 RAG**：500 字切分、重叠 80；jieba BM25 + `BAAI/bge-large-zh-v1.5` + RRF + `bge-reranker-large` 取 **Top 5** 段。  
 - **LightRAG**：1.5.8，默认 `mix` 查询；嵌入/重排与传统管线同一对。  
 - **GraphRAG**：未纳入（建索引贵，且项目目前基本是维护模式）。  
@@ -317,4 +317,4 @@
 2. 60 题总分接近（54–56），AmendAQ 赢在跨条 10 道与部分不编造，输在拒答与部分义务/数字。  
 3. 若「更好」指更快更省 → 传统 RAG；若指改一条不用重建索引 → AmendAQ；若指这 60 题最高总分 → 视条件 A/B 在传统 RAG / LightRAG 间切换，差距最多 2 分。
 
-系列回看：[1 · RAG 发展与问题](./01-why-amendaq.md) · [2 · AmendAQ 介绍](./02-what-amendaq-is.md) · 代码 [mycs](https://github.com/zealot2002/mycs)
+系列回看：[1 · RAG 发展与问题](./01-why-amendaq.md) · [2 · AmendAQ 介绍](./02-what-amendaq-is.md) · 代码 [AmendAQ](https://github.com/zealot2002/AmendAQ)

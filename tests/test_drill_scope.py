@@ -1,5 +1,5 @@
-from mycs.planning.drill_scope import should_release_drill_scope
-from mycs.planning.toc_drill import TocDrillResult
+from amendaq.planning.drill_scope import should_release_drill_scope
+from amendaq.planning.toc_drill import TocDrillResult
 
 
 def test_release_when_reason_says_chapter_lacks_topic():

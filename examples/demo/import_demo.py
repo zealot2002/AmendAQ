@@ -19,9 +19,9 @@ ROOT = Path(__file__).resolve().parents[2]
 
 sys.path.insert(0, str(ROOT / "src"))
 
-from mycs.db.connection import connect, get_db_path
-from mycs.kb.service import KbService
-from mycs.knowledge.service import ensure_database
+from amendaq.db.connection import connect, get_db_path
+from amendaq.kb.service import KbService
+from amendaq.knowledge.service import ensure_database
 
 
 def main() -> int:
@@ -62,7 +62,7 @@ def main() -> int:
 
 def _print_next_steps(doc_id: str) -> int:
     print(f"joyjoy: imported demo FAQ items")
-    print(f"joyjoy: next: export MYCS_GRAPH_DOCUMENT={doc_id}")
+    print(f"joyjoy: next: export AMENDAQ_GRAPH_DOCUMENT={doc_id}")
     print(f"joyjoy:          or select '{doc_id}' in the Vue UI")
     return 0
 

@@ -1,6 +1,6 @@
-from mycs.db.bootstrap import bootstrap_database
-from mycs.db.connection import connect
-from mycs.knowledge.service import KnowledgeService
+from amendaq.db.bootstrap import bootstrap_database
+from amendaq.db.connection import connect
+from amendaq.knowledge.service import KnowledgeService
 def test_find_wiki_by_topics(tmp_path):
     db = tmp_path / "test.db"
     bootstrap_database(db)

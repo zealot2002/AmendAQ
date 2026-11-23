@@ -28,12 +28,12 @@
             @select="onModuleSelect"
           >
             <el-menu-item index="">全部</el-menu-item>
-            <el-menu-item index="mycs.api">接口服务</el-menu-item>
-            <el-menu-item index="mycs.agent">问答编排</el-menu-item>
-            <el-menu-item index="mycs.llm">大模型</el-menu-item>
-            <el-menu-item index="mycs.graph">知识点</el-menu-item>
-            <el-menu-item index="mycs.wiki">知识目录</el-menu-item>
-            <el-menu-item index="mycs.knowledge">检索</el-menu-item>
+            <el-menu-item index="amendaq.api">接口服务</el-menu-item>
+            <el-menu-item index="amendaq.agent">问答编排</el-menu-item>
+            <el-menu-item index="amendaq.llm">大模型</el-menu-item>
+            <el-menu-item index="amendaq.graph">知识点</el-menu-item>
+            <el-menu-item index="amendaq.wiki">知识目录</el-menu-item>
+            <el-menu-item index="amendaq.knowledge">检索</el-menu-item>
           </el-menu>
         </div>
         <div class="block hint">

@@ -18,11 +18,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-os.environ.setdefault("MYCS_GRAPH_DOCUMENT", "xinghe_handbook")
-os.environ.setdefault("MYCS_DB", str(ROOT / "data" / "mycs.db"))
+os.environ.setdefault("AMENDAQ_GRAPH_DOCUMENT", "xinghe_handbook")
+os.environ.setdefault("AMENDAQ_DB", str(ROOT / "data" / "amendaq.db"))
 
-from mycs.agent.loop import AgentLoop  # noqa: E402
-from mycs.llm.factory import create_llm  # noqa: E402
+from amendaq.agent.loop import AgentLoop  # noqa: E402
+from amendaq.llm.factory import create_llm  # noqa: E402
 
 QUESTIONS = [
     "根据星河科技员工手册，如果一个全职员工刚好完成了一个完整工作年度，但之前已经结转了 8 天年假，那么他最多可以拥有多少天的年假余额？为什么？",
@@ -67,16 +67,16 @@ def main() -> int:
     import os
 
     handbook = ROOT / "docs" / "星河科技_中文员工手册_知识库测试.txt"
-    if handbook.is_file() and os.environ.get("MYCS_EVAL_SKIP_INGEST") != "1":
-        from mycs.graph.extract import ingest_txt_file
+    if handbook.is_file() and os.environ.get("AMENDAQ_EVAL_SKIP_INGEST") != "1":
+        from amendaq.graph.extract import ingest_txt_file
 
-        os.environ["MYCS_WIKI_AUTO_PUBLISH"] = "1"
+        os.environ["AMENDAQ_WIKI_AUTO_PUBLISH"] = "1"
         ingest_txt_file(handbook, document_id="xinghe_handbook")
         print("joyjoy: eval re-ingest + publish xinghe_handbook", flush=True)
 
-    llm_backend = os.environ.get("MYCS_LLM") or ("glm" if os.environ.get("GLM_API_KEY") else "ollama")
+    llm_backend = os.environ.get("AMENDAQ_LLM") or ("glm" if os.environ.get("GLM_API_KEY") else "ollama")
     glm_model = os.environ.get("GLM_MODEL") or os.environ.get("OPENAI_MODEL") or ""
-    pause = float(os.environ.get("MYCS_EVAL_PAUSE_SEC", "12" if "plus" in glm_model else "3"))
+    pause = float(os.environ.get("AMENDAQ_EVAL_PAUSE_SEC", "12" if "plus" in glm_model else "3"))
     print(f"joyjoy: eval backend={llm_backend} model={glm_model or 'default'} pause={pause}s", flush=True)
     loop = AgentLoop(llm=create_llm())
     rows: list[dict] = []
@@ -193,7 +193,7 @@ def _write_summary(
         "# 星河科技员工手册 — 测试评估汇总（Wiki TOC + LLM Plan）",
         "",
         f"**执行**：`uv run python scripts/run_xinghe_eval.py`（{ts} UTC）",
-        f"**LLM**：`MYCS_LLM={llm_backend}`"
+        f"**LLM**：`AMENDAQ_LLM={llm_backend}`"
         + (f" · `{llm_model}`" if llm_model else ""),
         f"**原始结果**：`{json_path.relative_to(ROOT)}`",
         "**建图**：`xinghe_handbook`（`data/kg/xinghe_handbook.json`）",
@@ -202,7 +202,7 @@ def _write_summary(
         "",
         "| 项 | 说明 |",
         "|----|------|",
-        "| Ingest | TOC-first draft → `mycs wiki publish` |",
+        "| Ingest | TOC-first draft → `AmendAQ wiki publish` |",
         "| Plan | `wiki_toc_outline` + `wiki.toc.branch` / graph 缺口 |",
         "| Verify | `wiki_leaves` + 实体；无检索时禁胡编 |",
         "",

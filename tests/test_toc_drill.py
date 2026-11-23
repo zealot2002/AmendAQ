@@ -1,10 +1,10 @@
 import uuid
 
-from mycs.db.connection import connect, get_db_path
-from mycs.knowledge.service import KnowledgeService, ensure_database
-from mycs.planning.sibling_expand import select_related_siblings, titles_share_topic
-from mycs.planning.toc_drill import run_toc_drill
-from mycs.wiki.toc_persist import ingest_document_toc_draft, publish_mount
+from amendaq.db.connection import connect, get_db_path
+from amendaq.knowledge.service import KnowledgeService, ensure_database
+from amendaq.planning.sibling_expand import select_related_siblings, titles_share_topic
+from amendaq.planning.toc_drill import run_toc_drill
+from amendaq.wiki.toc_persist import ingest_document_toc_draft, publish_mount
 
 
 class _StubSelector:
@@ -24,7 +24,7 @@ class _StubSelector:
 
 
 def test_toc_drill_two_levels(tmp_path, monkeypatch):
-    monkeypatch.setenv("MYCS_DB", str(tmp_path / "drill.db"))
+    monkeypatch.setenv("AMENDAQ_DB", str(tmp_path / "drill.db"))
     ensure_database()
     text = (
         "1. 总则\n"
@@ -88,7 +88,7 @@ def test_select_related_siblings_keeps_carryover_only():
 
 
 def test_toc_drill_expands_same_topic_sibling(tmp_path, monkeypatch):
-    monkeypatch.setenv("MYCS_DB", str(tmp_path / "sibling.db"))
+    monkeypatch.setenv("AMENDAQ_DB", str(tmp_path / "sibling.db"))
     ensure_database()
     text = (
         "5. 假期\n"

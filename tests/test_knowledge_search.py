@@ -1,4 +1,4 @@
-from mycs.knowledge.search import score_entity, tokenize
+from amendaq.knowledge.search import score_entity, tokenize
 
 
 def test_tokenize_bigrams_overlap_long_question():

@@ -1,6 +1,6 @@
 # 发给大模型的系统提示语。程序只读本文件，改这里即可。
 # 占位符写成 {{名字}}，运行时由程序填入。段落之间用空行分隔。
-# 技能何时启用仍看 src/mycs/skills/packs/*/SKILL.md 的头部；技能正文在本文件 skill_ 段。
+# 技能何时启用仍看 src/amendaq/skills/packs/*/SKILL.md 的头部；技能正文在本文件 skill_ 段。
 #
 # understand                     判断问题意图
 # toc_select                     从给出的问答里勾一条

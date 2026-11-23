@@ -12,14 +12,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from mycs.env_loader import load_project_dotenv  # noqa: E402
-from mycs.agent.loop import AgentLoop  # noqa: E402
-from mycs.llm.factory import create_llm  # noqa: E402
+from amendaq.env_loader import load_project_dotenv  # noqa: E402
+from amendaq.agent.loop import AgentLoop  # noqa: E402
+from amendaq.llm.factory import create_llm  # noqa: E402
 
 load_project_dotenv()
-os.environ.setdefault("MYCS_DB", str(ROOT / "data" / "mycs.db"))
-os.environ.setdefault("MYCS_GRAPH_DOCUMENT", "faq")
-os.environ.setdefault("MYCS_CHAT_SHOW_EVIDENCE", "0")
+os.environ.setdefault("AMENDAQ_DB", str(ROOT / "data" / "amendaq.db"))
+os.environ.setdefault("AMENDAQ_GRAPH_DOCUMENT", "faq")
+os.environ.setdefault("AMENDAQ_CHAT_SHOW_EVIDENCE", "0")
 
 CASES = [
     ("T01-下载", "好势APP怎么下载？"),
@@ -40,9 +40,9 @@ def main() -> int:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(timezone.utc).isoformat()
 
-    llm_backend = os.environ.get("MYCS_LLM") or ("glm" if os.environ.get("GLM_API_KEY") else "ollama")
+    llm_backend = os.environ.get("AMENDAQ_LLM") or ("glm" if os.environ.get("GLM_API_KEY") else "ollama")
     glm_model = os.environ.get("GLM_MODEL") or ""
-    pause = float(os.environ.get("MYCS_EVAL_PAUSE_SEC", "3"))
+    pause = float(os.environ.get("AMENDAQ_EVAL_PAUSE_SEC", "3"))
     print(f"joyjoy: haoshi faq eval backend={llm_backend} model={glm_model or 'default'} pause={pause}s", flush=True)
 
     loop = AgentLoop(llm=create_llm())

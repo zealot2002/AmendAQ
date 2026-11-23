@@ -1,4 +1,4 @@
-from mycs.planning.toc_batch_select import section_under_chapters, run_toc_batch_chapter_select
+from amendaq.planning.toc_batch_select import section_under_chapters, run_toc_batch_chapter_select
 
 
 def test_section_under_chapters():
@@ -29,7 +29,7 @@ class _FakeSvc:
 
 
 def test_batch_select_continue_then_pick(monkeypatch):
-    monkeypatch.setenv("MYCS_TOC_BATCH_SIZE", "4")
+    monkeypatch.setenv("AMENDAQ_TOC_BATCH_SIZE", "4")
     llm = _BatchLLM(
         [
             {"action": "continue", "section_refs": [], "reason": "none"},

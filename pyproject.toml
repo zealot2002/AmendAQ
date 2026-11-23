@@ -1,5 +1,5 @@
 [project]
-name = "mycs"
+name = "amendaq"
 version = "0.1.0"
 description = "Knowledge Agent customer service (reference implementation)"
 readme = "README.md"
@@ -19,9 +19,9 @@ compare = [
 ]
 
 [project.scripts]
-mycs = "mycs.cli:main"
-mycs-ui = "mycs.ui.gradio_app:main"
-mycs-api = "mycs.api.server:main"
+amendaq = "amendaq.cli:main"
+amendaq-ui = "amendaq.ui.gradio_app:main"
+amendaq-api = "amendaq.api.server:main"
 
 [build-system]
 requires = ["setuptools>=61"]

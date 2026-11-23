@@ -27,7 +27,7 @@ export function useAppBreadcrumbs() {
       return [level1, { label: docLabel }];
     }
 
-    return [{ label: (route.meta.title as string) || "mycs" }];
+    return [{ label: (route.meta.title as string) || "amendaq" }];
   });
 
   return { breadcrumbs };

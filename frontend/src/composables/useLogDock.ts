@@ -1,7 +1,7 @@
 import { ref, watch } from "vue";
 
-const OPEN_KEY = "mycs_log_dock_open";
-const SIDEBAR_COLLAPSED_KEY = "mycs_log_sidebar_collapsed";
+const OPEN_KEY = "amendaq_log_dock_open";
+const SIDEBAR_COLLAPSED_KEY = "amendaq_log_sidebar_collapsed";
 
 const open = ref(localStorage.getItem(OPEN_KEY) === "1");
 const sidebarCollapsed = ref(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) !== "0");

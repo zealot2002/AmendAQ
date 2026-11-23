@@ -1,4 +1,4 @@
-# mycs
+# AmendAQ
 
 **AmendAQ: a support agent that answers from published Q&A you can revise one row at a time — not from retrieved chunks.**
 
@@ -30,19 +30,21 @@ The Vue admin UI includes a process panel on the right side of the chat page tha
 
 > This is a real capture from an earlier demo. It shows the older Xinghe data, but the visible workflow is the same one this repo runs today: skip understand, batch-select FAQ IDs, load full texts, verify by rules.
 
-## Quick start (Vue / mycs-api path)
+## Quick start (Vue / amendaq-api path)
 
 This is the current default runnable path. The older Ollama graph build, `kg_*` APIs, government demo, and Gradio UI still exist in the repo but are not the main entry point.
 
 1. Copy and edit the environment file:
 
+Upgrading an older clone: rename `data/mycs.db` → `data/amendaq.db` if present, and replace any `MYCS_*` variables in `.env` with `AMENDAQ_*` (see `.env.example`).
+
 ```bash
 cp .env.example .env
 # Edit .env and set a provider:
-#   MYCS_LLM=glm    -> fill GLM_API_KEY
-#   MYCS_LLM=ollama -> set OLLAMA_BASE_URL to your Ollama host
-#   MYCS_LLM=openai -> set OPENAI_API_BASE and OPENAI_MODEL
-#   MYCS_LLM=groq   -> set GROQ_API_KEY
+#   AMENDAQ_LLM=glm    -> fill GLM_API_KEY
+#   AMENDAQ_LLM=ollama -> set OLLAMA_BASE_URL to your Ollama host
+#   AMENDAQ_LLM=openai -> set OPENAI_API_BASE and OPENAI_MODEL
+#   AMENDAQ_LLM=groq   -> set GROQ_API_KEY
 ```
 
 2. Install Python dependencies and start the dev environment:
@@ -52,7 +54,7 @@ uv sync --extra dev --extra web
 scripts/restart-dev.sh
 ```
 
-The script installs frontend dependencies if needed, starts the FastAPI backend (`mycs-api`) on port `8765`, and starts the Vite frontend on port `5180`. It prints the local URL, usually `http://127.0.0.1:5180/`.
+The script installs frontend dependencies if needed, starts the FastAPI backend (`amendaq-api`) on port `8765`, and starts the Vite frontend on port `5180`. It prints the local URL, usually `http://127.0.0.1:5180/`.
 
 3. Seed the bundled demo corpus:
 
@@ -77,8 +79,8 @@ Watch the right-hand process panel: it shows whether the model skipped the under
 If you already have a published library with `document_id` `my_kb`:
 
 ```bash
-export MYCS_GRAPH_DOCUMENT=my_kb
-uv run mycs "Can I call support on Saturday?"
+export AMENDAQ_GRAPH_DOCUMENT=my_kb
+uv run amendaq "Can I call support on Saturday?"
 ```
 
 The CLI path is advanced; the Vue UI is the recommended first entry.
@@ -86,7 +88,7 @@ The CLI path is advanced; the Vue UI is the recommended first entry.
 ## How it actually works
 
 1. **Pick a knowledge base.** When a document is selected in the UI, the agent skips the generic "understand" model call because the user already chose the context.
-2. **List published titles.** All `published` FAQ items in that library are loaded. If the count is at or below `MYCS_FAQ_SINGLE_PASS_MAX` (default 200), the whole title list is sent to the model at once. Above that, titles go out in batches of `MYCS_FAQ_BATCH_SIZE` (default 200), and every batch is scanned.
+2. **List published titles.** All `published` FAQ items in that library are loaded. If the count is at or below `AMENDAQ_FAQ_SINGLE_PASS_MAX` (default 200), the whole title list is sent to the model at once. Above that, titles go out in batches of `AMENDAQ_FAQ_BATCH_SIZE` (default 200), and every batch is scanned.
 3. **Model returns IDs only.** The model is asked to return only `section_refs` that match the question. IDs that are not in the list are discarded.
 4. **Load full texts.** The agent reads the full answer text for each selected ID.
 5. **Compose from source.** The model writes the final answer using only those full texts.
@@ -107,7 +109,7 @@ It imports the fictional **Stellar Systems Demo** FAQ from `examples/demo/`, run
 uv run python examples/eval/run_eval.py --dry-run
 ```
 
-The Chenghai handbook comparison (211 published Q&A, 60 questions, same `Qwen3.6` for mycs, a fixed traditional RAG pipeline, and LightRAG) is written up in [docs/posts/03-when-to-choose-amendaq.md](docs/posts/03-when-to-choose-amendaq.md). Public fixtures: [handbook source + published Q&A](docs/对比测试_澄海手册_知识库.md) ([source text](docs/对比测试_澄海手册_知识库.md#源手册正文), [Q&A entries](docs/对比测试_澄海手册_知识库.md#已发布问答)) and [questions + rubric answers](docs/对比测试_澄海手册_题目.md). Reproduce it with `scripts/run_compare.py`. On condition A, scores were AmendAQ 55/60, traditional RAG 56/60, LightRAG 54/60. The 10 questions that need two or more entries were 10/10 for AmendAQ. Traditional RAG was faster (median 7.6s vs 21.2s).
+The Chenghai handbook comparison (211 published Q&A, 60 questions, same `Qwen3.6` for AmendAQ, a fixed traditional RAG pipeline, and LightRAG) is written up in [docs/posts/03-when-to-choose-amendaq.md](docs/posts/03-when-to-choose-amendaq.md). Public fixtures: [handbook source + published Q&A](docs/对比测试_澄海手册_知识库.md) ([source text](docs/对比测试_澄海手册_知识库.md#源手册正文), [Q&A entries](docs/对比测试_澄海手册_知识库.md#已发布问答)) and [questions + rubric answers](docs/对比测试_澄海手册_题目.md). Reproduce it with `scripts/run_compare.py`. On condition A, scores were AmendAQ 55/60, traditional RAG 56/60, LightRAG 54/60. The 10 questions that need two or more entries were 10/10 for AmendAQ. Traditional RAG was faster (median 7.6s vs 21.2s).
 
 The original **Xinghe 13-question benchmark** is **still not reproducible from this repo**:
 
@@ -151,7 +153,7 @@ The code backs the Dev.to series [AmendAQ, a better RAG?](https://dev.to/zealot2
 | # | Title | What it covers |
 |---|-------|----------------|
 | 1 | [RAG 这六年怎么走过来的、2026 年前沿在做什么、以及它还剩哪些没解决的问题](https://dev.to/zealot2002/ru-guo-tiao-zhi-du-ke-yi-gai-wan-jiu-sheng-xiao-huan-yao-xian-xiang-liang-hua-ma-501b) ([repo](docs/posts/01-why-amendaq.md)) | Six years of RAG, 2026 frontier, vector limits on policy handbooks; AQ / AmendAQ |
-| 2 | [我们做了 AmendAQ：可改的问答，发布就是索引](https://dev.to/zealot2002/amendaq-zai-mycs-li-shi-ben-ke-yi-gai-de-wen-da-539) ([repo](docs/posts/02-what-amendaq-is.md)) | Publish gate, ID pick, verify by rules; shortcuts that did not ship |
+| 2 | [我们做了 AmendAQ：可改的问答，发布就是索引](https://dev.to/zealot2002/amendaq-zai-amendaq-li-shi-ben-ke-yi-gai-de-wen-da-539) ([repo](docs/posts/02-what-amendaq-is.md)) | Publish gate, ID pick, verify by rules; shortcuts that did not ship |
 | 3 | [澄海手册对照：AmendAQ、传统 RAG 与 LightRAG](https://dev.to/zealot2002/tong-ti-dui-zhao-zhi-hou-you-xie-chang-jing-ke-yi-xuan-ze-amendaq-1dhk) ([repo](docs/posts/03-when-to-choose-amendaq.md)) | 103×48 and 211×60 score tables, per-question matrix, when to pick which path |
 
 Source files: [docs/posts/](docs/posts/). Index: [docs/SERIES.md](docs/SERIES.md).

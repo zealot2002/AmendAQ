@@ -1,4 +1,4 @@
-from mycs.verifier import Verifier
+from amendaq.verifier import Verifier
 
 _PAY = "工资按月发放，一般次月 5 个自然日内发放；遇银行假日，提前至前一个工作日发放。"
 _GIFT = "单次每人礼品价值不超过 2000 新台币，不能造成义务或利益冲突；禁止收现金、现金等价物。"

@@ -1,5 +1,5 @@
-from mycs.prompts import load_prompts, prompt
-from mycs.skills.loader import load_skills
+from amendaq.prompts import load_prompts, prompt
+from amendaq.skills.loader import load_skills
 
 
 def test_prompt_file_has_every_section():
@@ -28,7 +28,7 @@ def test_prompt_fills_placeholders():
 
 
 def test_composite_selection_does_not_add_ordinary_cap():
-    from mycs.planning.flat_faq import faq_title_notes
+    from amendaq.planning.flat_faq import faq_title_notes
 
     kind_note, composite_note = faq_title_notes(
         enumerative_query=False,

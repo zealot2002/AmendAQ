@@ -1,4 +1,4 @@
-from mycs.answer_format import answer_for_user, split_answer_sections
+from amendaq.answer_format import answer_for_user, split_answer_sections
 
 
 def test_split_strips_conclusion_and_hides_evidence_from_user():

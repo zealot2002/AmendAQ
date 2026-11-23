@@ -10,9 +10,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from mycs.compare.questions import QUESTIONS  # noqa: E402
-from mycs.compare.report import render_report  # noqa: E402
-from mycs.compare.score import score_answer, summarize  # noqa: E402
+from amendaq.compare.questions import QUESTIONS  # noqa: E402
+from amendaq.compare.report import render_report  # noqa: E402
+from amendaq.compare.score import score_answer, summarize  # noqa: E402
 
 RESULT_PATH = ROOT / "data" / "eval" / "compare" / "results.json"
 REPORT_PATH = ROOT / "docs" / "对比测试_澄海手册.md"
@@ -21,15 +21,15 @@ SPECS = {item["id"]: item for item in QUESTIONS}
 
 def main() -> int:
     payload = json.loads(RESULT_PATH.read_text(encoding="utf-8"))
-    mycs = payload["systems"].get("mycs")
-    if mycs and mycs.get("_rows"):
-        _rescore_rows(mycs["_rows"])
+    AmendAQ = payload["systems"].get("amendaq")
+    if AmendAQ and amendaq.get("_rows"):
+        _rescore_rows(amendaq["_rows"])
         view = {
-            "summary": summarize(mycs["_rows"]),
-            "cost": mycs["conditions"]["faq"]["cost"],
-            "rows": mycs["_rows"],
+            "summary": summarize(amendaq["_rows"]),
+            "cost": amendaq["conditions"]["faq"]["cost"],
+            "rows": amendaq["_rows"],
         }
-        mycs["conditions"] = {"faq": view, "source": view}
+        amendaq["conditions"] = {"faq": view, "source": view}
     for key in ("traditional", "lightrag"):
         block = payload["systems"].get(key)
         if not block:

@@ -1,5 +1,5 @@
-from mycs.graph.extract import OllamaGraphExtractor, _merge_graph_payload
-from mycs.graph.model import KnowledgeGraph
+from amendaq.graph.extract import OllamaGraphExtractor, _merge_graph_payload
+from amendaq.graph.model import KnowledgeGraph
 
 
 class _FakeLLM:

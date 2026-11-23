@@ -1,11 +1,11 @@
 import logging
 
-from mycs.log_buffer import LogRingBuffer, install_log_buffer_handler
+from amendaq.log_buffer import LogRingBuffer, install_log_buffer_handler
 
 
 def test_ring_buffer_query_and_clear():
     buf = LogRingBuffer(maxlen=10)
-    logger = logging.getLogger("mycs.test.buffer")
+    logger = logging.getLogger("amendaq.test.buffer")
     handler = logging.Handler()
     handler.emit = lambda r: buf.append(r, formatted=f"{r.getMessage()}")  # type: ignore[method-assign]
     logger.addHandler(handler)
@@ -22,9 +22,9 @@ def test_ring_buffer_query_and_clear():
     assert items == []
 
 
-def test_install_handler_captures_mycs_logger():
+def test_install_handler_captures_amendaq_logger():
     install_log_buffer_handler()
-    log = logging.getLogger("mycs.test.install")
+    log = logging.getLogger("amendaq.test.install")
     log.info("capture me")
     buf = install_log_buffer_handler()
     tail, latest = buf.tail(limit=5)

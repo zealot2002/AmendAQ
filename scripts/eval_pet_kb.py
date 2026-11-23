@@ -11,9 +11,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from mycs.agent.loop import AgentLoop
-from mycs.env_loader import load_project_dotenv
-from mycs.llm.factory import create_llm
+from amendaq.agent.loop import AgentLoop
+from amendaq.env_loader import load_project_dotenv
+from amendaq.llm.factory import create_llm
 
 DOC = "kb_宠物饲养指南"
 
@@ -62,7 +62,7 @@ def _trace_metric(result) -> dict:
 
 def main() -> int:
     load_project_dotenv()
-    os.environ["MYCS_GRAPH_DOCUMENT"] = DOC
+    os.environ["AMENDAQ_GRAPH_DOCUMENT"] = DOC
     llm = create_llm()
     loop = AgentLoop(llm=llm)
     out: list[dict] = []

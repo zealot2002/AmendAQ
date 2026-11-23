@@ -1,5 +1,5 @@
-from mycs.models import UnderstandResult
-from mycs.planning.plan_schema import normalize_requirements
+from amendaq.models import UnderstandResult
+from amendaq.planning.plan_schema import normalize_requirements
 
 
 def test_llm_plan_normalizes_multi_gap():
@@ -64,7 +64,7 @@ def test_by_section_alone_skips_extra_search():
 
 
 def test_ollama_plan_parses_multi_gap_json():
-    from mycs.llm.ollama import OllamaLLM
+    from amendaq.llm.ollama import OllamaLLM
 
     llm = OllamaLLM(base_url="http://test/v1", model="test")
     llm._json_chat = lambda s, u, max_tokens=None: {  # type: ignore[method-assign]

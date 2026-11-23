@@ -1,4 +1,4 @@
-# mycs
+# AmendAQ
 
 **AmendAQ：从可以逐条修订的已发布问答作答，不靠检索回来的文本片段。**
 
@@ -30,19 +30,21 @@ Vue 管理界面的问答页右侧有一个过程面板，会展示每一步：�
 
 > 图中是较早的星河演示数据，但展示的工作流和本仓库当前运行的一致：跳过理解、批量勾选 FAQ 编号、加载完整原文、规则核对。
 
-## 快速开始（Vue / mycs-api 路径）
+## 快速开始（Vue / amendaq-api 路径）
 
 这是当前默认的可运行路径。仓库里仍然保留了旧的 Ollama 建图、`kg_*` API、政务 demo、Gradio UI，但它们不是主入口。
+
+从旧克隆升级：若存在 `data/mycs.db`，请改名为 `data/amendaq.db`；`.env` 里的 `MYCS_*` 改为 `AMENDAQ_*`（见 `.env.example`）。
 
 1. 复制并编辑环境文件：
 
 ```bash
 cp .env.example .env
 # 编辑 .env，选择一家大模型提供商：
-#   MYCS_LLM=glm    -> 填写 GLM_API_KEY
-#   MYCS_LLM=ollama -> 把 OLLAMA_BASE_URL 指向你的 Ollama 主机
-#   MYCS_LLM=openai -> 设置 OPENAI_API_BASE 和 OPENAI_MODEL
-#   MYCS_LLM=groq   -> 设置 GROQ_API_KEY
+#   AMENDAQ_LLM=glm    -> 填写 GLM_API_KEY
+#   AMENDAQ_LLM=ollama -> 把 OLLAMA_BASE_URL 指向你的 Ollama 主机
+#   AMENDAQ_LLM=openai -> 设置 OPENAI_API_BASE 和 OPENAI_MODEL
+#   AMENDAQ_LLM=groq   -> 设置 GROQ_API_KEY
 ```
 
 2. 安装 Python 依赖并启动开发环境：
@@ -52,7 +54,7 @@ uv sync --extra dev --extra web
 scripts/restart-dev.sh
 ```
 
-脚本会在需要时自动安装前端依赖，然后启动 FastAPI 后端（`mycs-api`，端口 `8765`）和 Vite 前端（端口 `5180`），并打印本地访问地址，通常是 `http://127.0.0.1:5180/`。
+脚本会在需要时自动安装前端依赖，然后启动 FastAPI 后端（`amendaq-api`，端口 `8765`）和 Vite 前端（端口 `5180`），并打印本地访问地址，通常是 `http://127.0.0.1:5180/`。
 
 3. 导入仓库自带的演示语料：
 
@@ -77,8 +79,8 @@ uv run python examples/demo/import_demo.py --lang zh
 如果你已经有了一个 `document_id` 为 `my_kb` 的已发布知识库：
 
 ```bash
-export MYCS_GRAPH_DOCUMENT=my_kb
-uv run mycs "周六可以打电话找客服吗？"
+export AMENDAQ_GRAPH_DOCUMENT=my_kb
+uv run amendaq "周六可以打电话找客服吗？"
 ```
 
 CLI 路径偏进阶；Vue 界面是推荐的首选入口。
@@ -86,7 +88,7 @@ CLI 路径偏进阶；Vue 界面是推荐的首选入口。
 ## 实际工作原理
 
 1. **选人库。** 当界面里已经选定一个知识库后，Agent 会跳过通用的"理解问题"模型调用，因为上下文已由用户指定。
-2. **列出已发布标题。** 加载该库所有 `published` 状态的 FAQ 条目。若数量不超过 `MYCS_FAQ_SINGLE_PASS_MAX`（默认 200），一次性把所有标题发给模型。超过之后按 `MYCS_FAQ_BATCH_SIZE`（默认 200）分批，每一批都走完。
+2. **列出已发布标题。** 加载该库所有 `published` 状态的 FAQ 条目。若数量不超过 `AMENDAQ_FAQ_SINGLE_PASS_MAX`（默认 200），一次性把所有标题发给模型。超过之后按 `AMENDAQ_FAQ_BATCH_SIZE`（默认 200）分批，每一批都走完。
 3. **模型只返回编号。** 模型被要求只返回匹配问题的 `section_refs`；不在列表里的编号会被程序丢弃。
 4. **加载完整原文。** Agent 按编号读取每条 FAQ 的完整答案。
 5. **依据原文撰写。** 模型只能用这些完整原文来写最终答复。
@@ -150,7 +152,7 @@ uv run python examples/eval/run_eval.py --lang zh --dry-run
 | # | 标题 | 内容 |
 |---|------|------|
 | 1 | [RAG 这六年怎么走过来的、2026 年前沿在做什么、以及它还剩哪些没解决的问题](https://dev.to/zealot2002/ru-guo-tiao-zhi-du-ke-yi-gai-wan-jiu-sheng-xiao-huan-yao-xian-xiang-liang-hua-ma-501b)（[仓库](docs/posts/01-why-amendaq.md)） | 六年 RAG、2026 前沿、制度场景五件事；AQ / AmendAQ |
-| 2 | [我们做了 AmendAQ：可改的问答，发布就是索引](https://dev.to/zealot2002/amendaq-zai-mycs-li-shi-ben-ke-yi-gai-de-wen-da-539)（[仓库](docs/posts/02-what-amendaq-is.md)） | 入库、勾编号、核对；试过又拿掉的两条路 |
+| 2 | [我们做了 AmendAQ：可改的问答，发布就是索引](https://dev.to/zealot2002/amendaq-zai-amendaq-li-shi-ben-ke-yi-gai-de-wen-da-539)（[仓库](docs/posts/02-what-amendaq-is.md)） | 入库、勾编号、核对；试过又拿掉的两条路 |
 | 3 | [澄海手册对照：AmendAQ、传统 RAG 与 LightRAG](https://dev.to/zealot2002/tong-ti-dui-zhao-zhi-hou-you-xie-chang-jing-ke-yi-xuan-ze-amendaq-1dhk)（[仓库](docs/posts/03-when-to-choose-amendaq.md)） | 103×48 与 211×60 汇总表、逐题表、怎么选路线 |
 
 正文在 [docs/posts/](docs/posts/)，索引在 [docs/SERIES.md](docs/SERIES.md)。

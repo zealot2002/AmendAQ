@@ -7,7 +7,7 @@
 入库命令：
 
 ```bash
-uv run mycs ingest handbook
+uv run amendaq ingest handbook
 ```
 
 产物：`data/wiki/canonical.json`

@@ -1,8 +1,8 @@
 import { ref, watch } from "vue";
 import { fetchContext, fetchWorkflow } from "@/api/client";
 
-const STORAGE_KEY = "mycs_document_id";
-const TITLE_STORAGE_KEY = "mycs_document_title";
+const STORAGE_KEY = "amendaq_document_id";
+const TITLE_STORAGE_KEY = "amendaq_document_title";
 
 const documentId = ref(localStorage.getItem(STORAGE_KEY) || "");
 const documentTitle = ref(localStorage.getItem(TITLE_STORAGE_KEY) || "");

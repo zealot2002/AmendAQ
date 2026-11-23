@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from mycs.wiki.outline import parse_outline_from_text
+from amendaq.wiki.outline import parse_outline_from_text
 
 
 def test_parse_outline_has_chapters_and_leaves():

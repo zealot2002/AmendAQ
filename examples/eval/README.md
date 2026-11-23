@@ -24,7 +24,7 @@ uv run python examples/eval/run_eval.py        # English questions
 uv run python examples/eval/run_eval.py --lang zh  # Chinese questions
 ```
 
-The script uses the LLM backend configured in your `.env` (e.g. `MYCS_LLM=glm`).
+The script uses the LLM backend configured in your `.env` (e.g. `AMENDAQ_LLM=glm`).
 
 ## Dry-run
 

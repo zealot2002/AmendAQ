@@ -2,12 +2,12 @@ import os
 
 import pytest
 
-from mycs.agent.loop import AgentLoop
-from mycs.cli import POLICY_ONLY_QUESTION, REFERENCE_CASE_ID, REFERENCE_QUESTION
+from amendaq.agent.loop import AgentLoop
+from amendaq.cli import POLICY_ONLY_QUESTION, REFERENCE_CASE_ID, REFERENCE_QUESTION
 
 pytestmark = pytest.mark.skipif(
-    os.environ.get("MYCS_INTEGRATION") != "1",
-    reason="requires Ollama; set MYCS_INTEGRATION=1",
+    os.environ.get("AMENDAQ_INTEGRATION") != "1",
+    reason="requires Ollama; set AMENDAQ_INTEGRATION=1",
 )
 
 

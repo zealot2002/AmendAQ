@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mycs.planning.comprehensive_toc import run_comprehensive_toc_recall
+from amendaq.planning.comprehensive_toc import run_comprehensive_toc_recall
 
 
 class _FakeKnowledge:
