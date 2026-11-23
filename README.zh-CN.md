@@ -34,7 +34,7 @@ Vue 管理界面的问答页右侧有一个过程面板，会展示每一步：�
 
 这是当前默认的可运行路径。仓库里仍然保留了旧的 Ollama 建图、`kg_*` API、政务 demo、Gradio UI，但它们不是主入口。
 
-从旧克隆升级：若存在 `data/mycs.db`，请改名为 `data/amendaq.db`；`.env` 里的 `MYCS_*` 改为 `AMENDAQ_*`（见 `.env.example`）。
+若你克隆的是更名前的版本，请让 `.env` 与 `.env.example` 一致（`AMENDAQ_*`），数据库文件用 `data/amendaq.db`。
 
 1. 复制并编辑环境文件：
 

@@ -36,7 +36,7 @@ This is the current default runnable path. The older Ollama graph build, `kg_*` 
 
 1. Copy and edit the environment file:
 
-Upgrading an older clone: rename `data/mycs.db` → `data/amendaq.db` if present, and replace any `MYCS_*` variables in `.env` with `AMENDAQ_*` (see `.env.example`).
+If you cloned before the package rename, point `.env` at `AMENDAQ_*` keys (see `.env.example`) and use `data/amendaq.db`.
 
 ```bash
 cp .env.example .env
