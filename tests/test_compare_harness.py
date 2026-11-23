@@ -22,7 +22,7 @@ def test_corpus_scale_and_two_views() -> None:
 
 
 def test_question_set_and_gold() -> None:
-    assert len(QUESTIONS) >= 140
+    assert len(QUESTIONS) >= 160
     ids = [item["id"] for item in QUESTIONS]
     assert len(ids) == len(set(ids))
     kinds = {item["kind"] for item in QUESTIONS}

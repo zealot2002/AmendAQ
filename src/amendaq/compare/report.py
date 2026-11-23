@@ -52,9 +52,13 @@ def render_report(payload: dict) -> str:
             (
                 f"- 这一轮已发布问答 {payload['faq_count']} 条。AmendAQ 每批送 200 条标题，扫完所有批次。"
                 + (
-                    "最后 10 道是必须跨多条已发布问答的复杂题。"
-                    if int(payload.get("question_count") or 0) >= 60
-                    else "题目含原来的 48 题和追加题。"
+                    "含原 10 道复杂题与新增 20 道跨条题，共 30 道须同时命中两条以上已发布问答。"
+                    if int(payload.get("question_count") or 0) >= 80
+                    else (
+                        "最后 10 道是必须跨多条已发布问答的复杂题。"
+                        if int(payload.get("question_count") or 0) >= 60
+                        else "题目含原来的 48 题和追加题。"
+                    )
                 )
                 + "传统管线的向量沿用本次目录里的缓存，表上的索引耗时是加载缓存的时间。LightRAG 的索引耗时仍是第一次抽取图谱的时间。"
             ),
@@ -76,7 +80,8 @@ def render_report(payload: dict) -> str:
         lines.append("")
         lines.extend(_kind_notes(systems, condition))
         lines.append("")
-    lines.extend(_complex_section(systems))
+    lines.extend(_complex_section(systems, "c_", "复杂题（原 10 道）", "下面 10 道是后补的。每道都要同时用到两条以上已发布问答，只命中其中一条算没答全。"))
+    lines.extend(_complex_section(systems, "x_cross_", "跨条题（新增 20 道）", "下面 20 道与第 51–60 题组合不重复。每道都要同时用到两条以上已发布问答。"))
     lines.append("## 逐题")
     lines.append("")
     lines.append(_detail_table(systems))
@@ -93,14 +98,14 @@ def _accuracy_table(systems: dict, condition: str) -> str:
     totals = {key: [0, 0] for key in keys}
     for kind in kinds:
         cells = [KIND_LABEL[kind], ""]
-        n_shown = None
+        n_per_key: list[int] = []
         for key in keys:
             summary = systems[key]["conditions"][condition]["summary"]["by_kind"].get(kind, {"n": 0, "ok": 0})
-            n_shown = summary["n"]
+            n_per_key.append(summary["n"])
             cells.append(_pct(summary["ok"], summary["n"]))
             totals[key][0] += summary["ok"]
             totals[key][1] += summary["n"]
-        cells[1] = str(n_shown or 0)
+        cells[1] = str(max(n_per_key) if n_per_key else 0)
         rows.append("| " + " | ".join(cells) + " |")
     total_cells = ["合计", str(next(iter(totals.values()))[1] if totals else 0)]
     for key in keys:
@@ -207,7 +212,7 @@ def _detail_table(systems: dict) -> str:
     order = [item["id"] for item in QUESTIONS if item["id"] in seen]
     for qid in order:
         spec = by_id[qid]
-        cells = [qid, KIND_LABEL.get(spec["kind"], spec["kind"])]
+        cells = [spec.get("question") or qid, KIND_LABEL.get(spec["kind"], spec["kind"])]
         for key in keys:
             faq_rows = systems[key]["conditions"].get("faq", {}).get("rows", [])
             cells.append(_mark(faq_rows, qid))
@@ -218,22 +223,17 @@ def _detail_table(systems: dict) -> str:
     return "\n".join(rows)
 
 
-def _complex_section(systems: dict) -> list[str]:
-    specs = [item for item in QUESTIONS if str(item["id"]).startswith("c_")]
-    if len(specs) < 10:
+def _complex_section(systems: dict, prefix: str, heading: str, intro: str) -> list[str]:
+    specs = [item for item in QUESTIONS if str(item["id"]).startswith(prefix)]
+    if not specs:
         return []
     amendaq_rows = systems.get("amendaq", {}).get("conditions", {}).get("faq", {}).get("rows", [])
     have = {row["id"] for row in amendaq_rows}
     if any(spec["id"] not in have for spec in specs):
         return []
     keys = [key for key in ("amendaq", "traditional", "lightrag") if key in systems]
-    lines = [
-        "## 复杂题",
-        "",
-        "下面 10 道是后补的。每道都要同时用到两条以上已发布问答，只命中其中一条算没答全。",
-        "",
-    ]
-    header = ["题", "类型"]
+    lines = [f"## {heading}", "", intro, ""]
+    header = ["题目", "类型"]
     for key in keys:
         header.append(_system_label(systems, key) + " A")
         if key != "amendaq":
@@ -241,7 +241,7 @@ def _complex_section(systems: dict) -> list[str]:
     rows = ["| " + " | ".join(header) + " |", "|" + "|".join(["---"] * len(header)) + "|"]
     totals = {key: {"faq": [0, 0], "source": [0, 0]} for key in keys}
     for spec in specs:
-        cells = [spec["id"], KIND_LABEL.get(spec["kind"], spec["kind"])]
+        cells = [spec.get("question") or spec["id"], KIND_LABEL.get(spec["kind"], spec["kind"])]
         for key in keys:
             for cond in ("faq", "source"):
                 if key == "amendaq" and cond == "source":
@@ -264,7 +264,7 @@ def _complex_section(systems: dict) -> list[str]:
             continue
         source_ok, source_n = totals[key]["source"]
         bits.append(f"{label} 条件 A {faq_ok}/{faq_n}、条件 B {source_ok}/{source_n}")
-    lines.append("这 10 道单独计：" + "；".join(bits) + "。")
+    lines.append(f"这 {len(specs)} 道单独计：" + "；".join(bits) + "。")
     lines.append("")
     return lines
 

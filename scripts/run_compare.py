@@ -30,6 +30,7 @@ from amendaq.compare.corpus import TITLE, iter_faqs, render_faq, render_source  
 from amendaq.compare.lightrag_baseline import available as lightrag_available  # noqa: E402
 from amendaq.compare.prepare import build_faq_db  # noqa: E402
 from amendaq.compare.questions import QUESTIONS  # noqa: E402
+from amendaq.compare.questions_cross20 import CROSS20_QUESTIONS  # noqa: E402
 from amendaq.compare.report import render_report  # noqa: E402
 from amendaq.compare.score import score_answer, summarize  # noqa: E402
 from amendaq.compare.traditional import pipeline_lock  # noqa: E402
@@ -61,8 +62,14 @@ def main() -> int:
         REPORT_PATH = Path(args.report)
         if not REPORT_PATH.is_absolute():
             REPORT_PATH = ROOT / REPORT_PATH
-    systems = [item.strip() for item in args.systems.split(",") if item.strip()]
-    questions = QUESTIONS[: args.limit] if args.limit else list(QUESTIONS)
+    _alias = {"amendaq": "amendaq", "AmendAQ": "amendaq", "traditional": "traditional", "lightrag": "lightrag"}
+    systems = [_alias.get(item.strip(), item.strip().lower()) for item in args.systems.split(",") if item.strip()]
+    if args.limit:
+        questions = QUESTIONS[: args.limit]
+    elif OUT_DIR.name == "compare200" or str(args.out_dir).rstrip("/").endswith("compare200"):
+        questions = QUESTIONS[:60] + list(CROSS20_QUESTIONS)
+    else:
+        questions = list(QUESTIONS)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     started = time.perf_counter()

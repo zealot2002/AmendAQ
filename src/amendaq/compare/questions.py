@@ -445,6 +445,8 @@ QUESTIONS: list[dict] = [
     },
 ]
 
+from amendaq.compare.questions_cross20 import CROSS20_QUESTIONS  # noqa: E402
 from amendaq.compare.questions_extra import EXTRA_QUESTIONS  # noqa: E402
 
 QUESTIONS.extend(EXTRA_QUESTIONS)
+QUESTIONS.extend(CROSS20_QUESTIONS)

@@ -108,7 +108,7 @@ uv run python examples/eval/run_eval.py --lang zh
 uv run python examples/eval/run_eval.py --lang zh --dry-run
 ```
 
-澄海手册对照（211 条已发布问答、60 题，同一 `Qwen3.6`，对照一条固定的传统 RAG 和 LightRAG）写在 [docs/posts/03-when-to-choose-amendaq.md](docs/posts/03-when-to-choose-amendaq.md)。公开语料：[测试知识库原文](docs/对比测试_澄海手册_知识库.md)（[源手册正文](docs/对比测试_澄海手册_知识库.md#源手册正文)、[已发布问答](docs/对比测试_澄海手册_知识库.md#已发布问答)）与 [60 题题干与标准答案](docs/对比测试_澄海手册_题目.md)。复现入口是 `scripts/run_compare.py`。条件 A 的分数是 AmendAQ 55/60、传统 RAG 56/60、LightRAG 54/60。必须跨两条以上的 10 道，AmendAQ 是 10/10。传统 RAG 更快，单题中位 7.6 秒，AmendAQ 是 21.2 秒。
+澄海手册对照（211 条已发布问答、**80 题**（含新增 20 道跨条），对照一条固定的传统 RAG 和 LightRAG）写在 [docs/posts/03-when-to-choose-amendaq.md](docs/posts/03-when-to-choose-amendaq.md)。公开语料：[测试知识库原文](docs/对比测试_澄海手册_知识库.md)、[80 题题干](docs/对比测试_澄海手册_题目.md)、[跨条 20 道](docs/跨条题-20.md)。复现：`uv run python scripts/run_compare.py --out-dir data/eval/compare200 --report docs/对比测试_澄海手册_200条.md --systems amendaq,traditional,lightrag --resume`。30 道跨条题上，AmendAQ 条件 B **19/30** 高于传统 RAG **17/30**；原 10 道复杂题 AmendAQ 仍 **10/10**。
 
 原始 **星河 13 题评测在当前仓库仍然无法复现**：
 
@@ -153,7 +153,7 @@ uv run python examples/eval/run_eval.py --lang zh --dry-run
 |---|------|------|
 | 1 | [RAG 这六年怎么走过来的、2026 年前沿在做什么、以及它还剩哪些没解决的问题](https://dev.to/zealot2002/ru-guo-tiao-zhi-du-ke-yi-gai-wan-jiu-sheng-xiao-huan-yao-xian-xiang-liang-hua-ma-501b)（[仓库](docs/posts/01-why-amendaq.md)） | 六年 RAG、2026 前沿、制度场景五件事；AQ / AmendAQ |
 | 2 | [我们做了 AmendAQ：可改的问答，发布就是索引](https://dev.to/zealot2002/amendaq-zai-amendaq-li-shi-ben-ke-yi-gai-de-wen-da-539)（[仓库](docs/posts/02-what-amendaq-is.md)） | 入库、勾编号、核对；试过又拿掉的两条路 |
-| 3 | [澄海手册对照：AmendAQ、传统 RAG 与 LightRAG](https://dev.to/zealot2002/tong-ti-dui-zhao-zhi-hou-you-xie-chang-jing-ke-yi-xuan-ze-amendaq-1dhk)（[仓库](docs/posts/03-when-to-choose-amendaq.md)） | 103×48 与 211×60 汇总表、逐题表、怎么选路线 |
+| 3 | [澄海手册对照：AmendAQ、传统 RAG 与 LightRAG](https://dev.to/zealot2002/tong-ti-dui-zhao-zhi-hou-you-xie-chang-jing-ke-yi-xuan-ze-amendaq-1dhk)（[仓库](docs/posts/03-when-to-choose-amendaq.md)） | 103×48 与 211×80（30 道跨条）汇总表、逐题表、怎么选路线 |
 
 正文在 [docs/posts/](docs/posts/)，索引在 [docs/SERIES.md](docs/SERIES.md)。
 
