@@ -253,8 +253,8 @@ def main() -> None:
     )
 
     new_post, n = re.subn(
-        r"## 三、211 条 · \d+ 题（主对照）.*?## 四、怎么读这些表",
-        section3 + "\n---\n\n## 四、怎么读这些表",
+        r"## 三、211 条 · \d+ 题（主对照）.*?## 四、对照表分析",
+        section3 + "\n---\n\n## 四、对照表分析",
         post,
         count=1,
         flags=re.S,
