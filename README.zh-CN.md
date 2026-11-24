@@ -12,6 +12,10 @@
 
 [English README](README.md)
 
+![AmendAQ 改一条即生效演示](docs/images/amendaq-demo.gif)
+
+*免安装交互演示（打开 [`docs/demo/index.html`](docs/demo/index.html) 即可本地体验，无需 API Key）：修改单条已发布问答并点击发布（零重新索引），下一问立即引用新原文并通过规则核对，同时支持浏览全部 80 道澄海手册三家对照实录。*
+
 ## 这和常见的 RAG 有什么不同
 
 | | Chunk + 向量 + 生成 | AmendAQ（已发布 FAQ + 勾选编号 + 规则核对） |
@@ -87,7 +91,7 @@ CLI 路径偏进阶；Vue 界面是推荐的首选入口。
 
 ## 实际工作原理
 
-1. **选人库。** 当界面里已经选定一个知识库后，Agent 会跳过通用的"理解问题"模型调用，因为上下文已由用户指定。
+1. **选定知识库。** 当界面里已经选定一个知识库后，Agent 会跳过通用的"理解问题"模型调用，因为上下文已由用户指定。
 2. **列出已发布标题。** 加载该库所有 `published` 状态的 FAQ 条目。若数量不超过 `AMENDAQ_FAQ_SINGLE_PASS_MAX`（默认 200），一次性把所有标题发给模型。超过之后按 `AMENDAQ_FAQ_BATCH_SIZE`（默认 200）分批，每一批都走完。
 3. **模型只返回编号。** 模型被要求只返回匹配问题的 `section_refs`；不在列表里的编号会被程序丢弃。
 4. **加载完整原文。** Agent 按编号读取每条 FAQ 的完整答案。
@@ -136,7 +140,7 @@ uv run python scripts/run_compare.py --out-dir data/eval/compare200 --report doc
 
 `uv sync --extra compare` 即可运行双系统对比（`--systems AmendAQ,traditional`）。若要加入 LightRAG 列，可安装 `lightrag` 附加项（`uv sync --extra compare --extra lightrag`）或设置 `AMENDAQ_LIGHTRAG_ROOT=/path/to/LightRAG`。
 
-完整说明：[docs/posts/03-when-to-choose-amendaq.md](docs/posts/03-when-to-choose-amendaq.md)。公开语料：[测试知识库原文](docs/对比测试_澄海手册_知识库.md)、[80 题题干](docs/对比测试_澄海手册_题目.md)、[跨条 20 道](docs/跨条题-20.md)。
+完整说明：[docs/posts/03-when-to-choose-amendaq.md](docs/posts/03-when-to-choose-amendaq.md)。英文完整版：[Dev.to](https://dev.to/zealot2002/amendaq-vs-a-fixed-traditional-rag-pipeline-and-lightrag-on-80-handbook-questions-4l20) · [Hashnode](https://goodlords.hashnode.dev/no-vector-faq-q-a-vs-hybrid-rag-and-lightrag-an-80-question-benchmark-on-qwen3-6)。公开语料：[测试知识库原文](docs/对比测试_澄海手册_知识库.md)、[80 题题干](docs/对比测试_澄海手册_题目.md)、[跨条 20 道](docs/跨条题-20.md)。
 
 原始 **星河 13 题评测在当前仓库仍然无法复现**：
 
@@ -182,6 +186,7 @@ uv run python scripts/run_compare.py --out-dir data/eval/compare200 --report doc
 | 1 | [RAG 这六年怎么走过来的、2026 年前沿在做什么、以及它还剩哪些没解决的问题](https://dev.to/zealot2002/ru-guo-tiao-zhi-du-ke-yi-gai-wan-jiu-sheng-xiao-huan-yao-xian-xiang-liang-hua-ma-501b)（[仓库](docs/posts/01-why-amendaq.md)） | 六年 RAG、2026 前沿、制度场景五件事；AQ / AmendAQ |
 | 2 | [我们做了 AmendAQ：可改的问答，发布就是索引](https://dev.to/zealot2002/amendaq-zai-mycs-li-shi-ben-ke-yi-gai-de-wen-da-539)（[仓库](docs/posts/02-what-amendaq-is.md)） | 入库、勾编号、核对；试过又拿掉的两条路 |
 | 3 | [澄海手册对照：AmendAQ、传统 RAG 与 LightRAG](https://dev.to/zealot2002/tong-ti-dui-zhao-zhi-hou-you-xie-chang-jing-ke-yi-xuan-ze-amendaq-1dhk)（[仓库](docs/posts/03-when-to-choose-amendaq.md)） | 103×48 与 211×80（30 道跨条）汇总表、逐题表、怎么选路线 |
+| EN | [AmendAQ vs. a Fixed Traditional RAG Pipeline and LightRAG on 80 Handbook Questions](https://dev.to/zealot2002/amendaq-vs-a-fixed-traditional-rag-pipeline-and-lightrag-on-80-handbook-questions-4l20)（[Hashnode](https://goodlords.hashnode.dev/no-vector-faq-q-a-vs-hybrid-rag-and-lightrag-an-80-question-benchmark-on-qwen3-6)） | Qwen3.6 211×80 评测英文完整版，跨条题详细分析，延迟与 token 权衡 |
 
 正文在 [docs/posts/](docs/posts/)，索引在 [docs/SERIES.md](docs/SERIES.md)。
 

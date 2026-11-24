@@ -12,6 +12,10 @@ This is the runnable slice of a larger idea: RAG should end in knowledge, not in
 
 [中文说明](README.zh-CN.md)
 
+![AmendAQ edit-to-publish workflow demo](docs/images/amendaq-demo.gif)
+
+*Interactive walkthrough (client-side playground in [`docs/demo/index.html`](docs/demo/index.html), no API key needed): edit a published FAQ row, click **Publish** (0 ms re-index), and watch the next question cite the updated rule and pass deterministic verification — plus browse all 80 real benchmark questions.*
+
 ## Why this is not another RAG
 
 | | Chunk + vector + generate | AmendAQ (published FAQ + ID selection + rule verify) |
@@ -137,7 +141,7 @@ uv run python scripts/run_compare.py --out-dir data/eval/compare200 --report doc
 
 `uv sync --extra compare` runs the two-system comparison (`--systems AmendAQ,traditional`) out of the box. To add the LightRAG column, either install the `lightrag` extra (`uv sync --extra compare --extra lightrag`) or set `AMENDAQ_LIGHTRAG_ROOT=/path/to/LightRAG`.
 
-Full write-up: [docs/posts/03-when-to-choose-amendaq.md](docs/posts/03-when-to-choose-amendaq.md). Public fixtures: [handbook source + published Q&A](docs/对比测试_澄海手册_知识库.md) and [questions + rubric answers](docs/对比测试_澄海手册_题目.md).
+Full write-up: [docs/posts/03-when-to-choose-amendaq.md](docs/posts/03-when-to-choose-amendaq.md). English breakdown: [Dev.to](https://dev.to/zealot2002/amendaq-vs-a-fixed-traditional-rag-pipeline-and-lightrag-on-80-handbook-questions-4l20) · [Hashnode](https://goodlords.hashnode.dev/no-vector-faq-q-a-vs-hybrid-rag-and-lightrag-an-80-question-benchmark-on-qwen3-6). Public fixtures: [handbook source + published Q&A](docs/对比测试_澄海手册_知识库.md) and [questions + rubric answers](docs/对比测试_澄海手册_题目.md).
 
 The original **Xinghe 13-question benchmark** is **still not reproducible from this repo**:
 
@@ -183,6 +187,7 @@ The code backs the Dev.to series [AmendAQ, a better RAG?](https://dev.to/zealot2
 | 1 | [RAG 这六年怎么走过来的、2026 年前沿在做什么、以及它还剩哪些没解决的问题](https://dev.to/zealot2002/ru-guo-tiao-zhi-du-ke-yi-gai-wan-jiu-sheng-xiao-huan-yao-xian-xiang-liang-hua-ma-501b) ([repo](docs/posts/01-why-amendaq.md)) | Six years of RAG, 2026 frontier, vector limits on policy handbooks; AQ / AmendAQ |
 | 2 | [我们做了 AmendAQ：可改的问答，发布就是索引](https://dev.to/zealot2002/amendaq-zai-mycs-li-shi-ben-ke-yi-gai-de-wen-da-539) ([repo](docs/posts/02-what-amendaq-is.md)) | Publish gate, ID pick, verify by rules; shortcuts that did not ship |
 | 3 | [澄海手册对照：AmendAQ、传统 RAG 与 LightRAG](https://dev.to/zealot2002/tong-ti-dui-zhao-zhi-hou-you-xie-chang-jing-ke-yi-xuan-ze-amendaq-1dhk) ([repo](docs/posts/03-when-to-choose-amendaq.md)) | 103×48 and 211×80 (30 cross-AQ) score tables, per-question matrix, when to pick which path |
+| EN | [AmendAQ vs. a Fixed Traditional RAG Pipeline and LightRAG on 80 Handbook Questions](https://dev.to/zealot2002/amendaq-vs-a-fixed-traditional-rag-pipeline-and-lightrag-on-80-handbook-questions-4l20) ([Hashnode](https://goodlords.hashnode.dev/no-vector-faq-q-a-vs-hybrid-rag-and-lightrag-an-80-question-benchmark-on-qwen3-6)) | Standalone English breakdown of the 211×80 Qwen3.6 benchmark, cross-entry wins, and latency/token trade-offs |
 
 Source files: [docs/posts/](docs/posts/). Index: [docs/SERIES.md](docs/SERIES.md).
 
