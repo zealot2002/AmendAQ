@@ -108,7 +108,7 @@ uv run python examples/eval/run_eval.py --lang zh
 uv run python examples/eval/run_eval.py --lang zh --dry-run
 ```
 
-澄海手册对照（211 条已发布问答、**80 题**（含新增 20 道跨条），对照一条固定的传统 RAG 和 LightRAG）写在 [docs/posts/03-when-to-choose-amendaq.md](docs/posts/03-when-to-choose-amendaq.md)。公开语料：[测试知识库原文](docs/对比测试_澄海手册_知识库.md)、[80 题题干](docs/对比测试_澄海手册_题目.md)、[跨条 20 道](docs/跨条题-20.md)。复现：`uv run python scripts/run_compare.py --out-dir data/eval/compare200 --report docs/对比测试_澄海手册_200条.md --systems amendaq,traditional,lightrag --resume`。30 道跨条题上，AmendAQ 条件 B **19/30** 高于传统 RAG **17/30**；原 10 道复杂题 AmendAQ 仍 **10/10**。
+澄海手册对照（211 条已发布问答、**80 题**（含新增 20 道跨条），对照一条固定的传统 RAG 和 LightRAG）写在 [docs/posts/03-when-to-choose-amendaq.md](docs/posts/03-when-to-choose-amendaq.md)。公开语料：[测试知识库原文](docs/对比测试_澄海手册_知识库.md)、[80 题题干](docs/对比测试_澄海手册_题目.md)、[跨条 20 道](docs/跨条题-20.md)。复现：`uv sync --extra compare` 即可运行双系统对比（`--systems AmendAQ,traditional`）。若要加入 LightRAG 列，可安装 `lightrag` 附加项（`uv sync --extra compare --extra lightrag`）或设置 `AMENDAQ_LIGHTRAG_ROOT=/path/to/LightRAG`。30 道跨条题上，AmendAQ 条件 B **19/30** 高于传统 RAG **17/30**；原 10 道复杂题 AmendAQ 仍 **10/10**。
 
 原始 **星河 13 题评测在当前仓库仍然无法复现**：
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -17,19 +18,39 @@ import numpy as np
 from amendaq.compare.traditional import EMBED_MODEL, QUERY_PREFIX, RERANK_MODEL
 from amendaq.llm.openai_compat import OpenAICompatLLM
 
-LIGHTRAG_ROOT = Path("/Users/zzy/study/LightRAG")
-
 
 def available() -> tuple[bool, str]:
-    if not LIGHTRAG_ROOT.is_dir():
-        return False, f"未找到 {LIGHTRAG_ROOT}"
-    if str(LIGHTRAG_ROOT) not in sys.path:
-        sys.path.insert(0, str(LIGHTRAG_ROOT))
+    """Check if LightRAG is available via env var path or pip-installed package.
+    
+    Returns:
+        (True, "") if available, or (False, error_message) with actionable hint.
+    """
+    # Check for AMENDAQ_LIGHTRAG_ROOT environment variable
+    lightrag_root_str = os.environ.get("AMENDAQ_LIGHTRAG_ROOT", "").strip()
+    if lightrag_root_str:
+        lightrag_root = Path(lightrag_root_str)
+        if not lightrag_root.is_dir():
+            return False, (
+                f"AMENDAQ_LIGHTRAG_ROOT is set to '{lightrag_root_str}' but that directory does not exist. "
+                f"Please verify the path or unset the variable."
+            )
+        # Add to sys.path if not already present
+        if str(lightrag_root) not in sys.path:
+            sys.path.insert(0, str(lightrag_root))
+    
+    # Try importing lightrag (works for both pip-installed and AMENDAQ_LIGHTRAG_ROOT)
     try:
         import lightrag  # noqa: F401
+        return True, ""
+    except ImportError:
+        return False, (
+            "LightRAG is not installed. To use the lightrag baseline, either:\n"
+            "  1. Install lightrag-hku: `uv sync --extra compare --extra lightrag` (or `pip install lightrag-hku`)\n"
+            "  2. Set AMENDAQ_LIGHTRAG_ROOT=/path/to/LightRAG for a local checkout\n"
+            "  3. Run with --systems AmendAQ,traditional for the two-system comparison"
+        )
     except Exception as exc:
-        return False, f"LightRAG 依赖未装上：{exc}"
-    return True, ""
+        return False, f"LightRAG import failed: {exc}"
 
 
 class LightRAGBaseline:
