@@ -14,7 +14,7 @@
 
 ![AmendAQ 改一条即生效演示](docs/images/amendaq-demo.gif)
 
-*免安装交互演示（打开 [`docs/demo/index.html`](docs/demo/index.html) 即可本地体验，无需 API Key）：修改单条已发布问答并点击发布（零重新索引），下一问立即引用新原文并通过规则核对，同时支持浏览全部 80 道澄海手册三家对照实录。*
+*免安装交互演示（[在线 playground](https://zealot2002.github.io/AmendAQ/demo/)，无需 API Key）：修改单条已发布问答并点击发布（零重新索引），下一问立即引用新原文并通过规则核对，同时支持浏览全部 80 道澄海手册三家对照实录。*
 
 ## 这和常见的 RAG 有什么不同
 

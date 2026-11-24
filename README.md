@@ -14,7 +14,7 @@ This is the runnable slice of a larger idea: RAG should end in knowledge, not in
 
 ![AmendAQ edit-to-publish workflow demo](docs/images/amendaq-demo.gif)
 
-*Interactive walkthrough (client-side playground in [`docs/demo/index.html`](docs/demo/index.html), no API key needed): edit a published FAQ row, click **Publish** (0 ms re-index), and watch the next question cite the updated rule and pass deterministic verification — plus browse all 80 real benchmark questions.*
+*Interactive walkthrough ([client-side playground](https://zealot2002.github.io/AmendAQ/demo/), no API key needed): edit a published FAQ row, click **Publish** (0 ms re-index), and watch the next question cite the updated rule and pass deterministic verification — plus browse all 80 real benchmark questions.*
 
 ## Why this is not another RAG
 
