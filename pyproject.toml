@@ -24,6 +24,7 @@ compare = [
     "aiohttp>=3.9",
     "tiktoken>=0.7",
 ]
+lightrag = ["lightrag-hku>=1.4"]
 
 [project.scripts]
 amendaq = "amendaq.cli:main"

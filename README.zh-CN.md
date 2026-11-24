@@ -134,6 +134,8 @@ uv sync --extra compare
 uv run python scripts/run_compare.py --out-dir data/eval/compare200 --report docs/对比测试_澄海手册_200条.md --systems amendaq,traditional,lightrag --resume
 ```
 
+`uv sync --extra compare` 即可运行双系统对比（`--systems AmendAQ,traditional`）。若要加入 LightRAG 列，可安装 `lightrag` 附加项（`uv sync --extra compare --extra lightrag`）或设置 `AMENDAQ_LIGHTRAG_ROOT=/path/to/LightRAG`。
+
 完整说明：[docs/posts/03-when-to-choose-amendaq.md](docs/posts/03-when-to-choose-amendaq.md)。公开语料：[测试知识库原文](docs/对比测试_澄海手册_知识库.md)、[80 题题干](docs/对比测试_澄海手册_题目.md)、[跨条 20 道](docs/跨条题-20.md)。
 
 原始 **星河 13 题评测在当前仓库仍然无法复现**：

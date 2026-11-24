@@ -135,6 +135,8 @@ uv sync --extra compare
 uv run python scripts/run_compare.py --out-dir data/eval/compare200 --report docs/对比测试_澄海手册_200条.md --systems AmendAQ,traditional,lightrag --resume
 ```
 
+`uv sync --extra compare` runs the two-system comparison (`--systems AmendAQ,traditional`) out of the box. To add the LightRAG column, either install the `lightrag` extra (`uv sync --extra compare --extra lightrag`) or set `AMENDAQ_LIGHTRAG_ROOT=/path/to/LightRAG`.
+
 Full write-up: [docs/posts/03-when-to-choose-amendaq.md](docs/posts/03-when-to-choose-amendaq.md). Public fixtures: [handbook source + published Q&A](docs/对比测试_澄海手册_知识库.md) and [questions + rubric answers](docs/对比测试_澄海手册_题目.md).
 
 The original **Xinghe 13-question benchmark** is **still not reproducible from this repo**:
