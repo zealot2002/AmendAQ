@@ -109,7 +109,35 @@ It imports the fictional **Stellar Systems Demo** FAQ from `examples/demo/`, run
 uv run python examples/eval/run_eval.py --dry-run
 ```
 
-The Chenghai handbook comparison (211 published Q&A, 60 questions, same `Qwen3.6` for AmendAQ, a fixed traditional RAG pipeline, and LightRAG) is written up in [docs/posts/03-when-to-choose-amendaq.md](docs/posts/03-when-to-choose-amendaq.md). Public fixtures: [handbook source + published Q&A](docs/对比测试_澄海手册_知识库.md) ([source text](docs/对比测试_澄海手册_知识库.md#源手册正文), [Q&A entries](docs/对比测试_澄海手册_知识库.md#已发布问答)) and [questions + rubric answers](docs/对比测试_澄海手册_题目.md). Reproduce it with `scripts/run_compare.py`. `uv sync --extra compare` runs the two-system comparison (`--systems AmendAQ,traditional`) out of the box. To add the LightRAG column, either install the `lightrag` extra (`uv sync --extra compare --extra lightrag`) or set `AMENDAQ_LIGHTRAG_ROOT=/path/to/LightRAG`. On condition A, scores were AmendAQ 55/60, traditional RAG 56/60, LightRAG 54/60. The 10 questions that need two or more entries were 10/10 for AmendAQ. Traditional RAG was faster (median 7.6s vs 21.2s).
+### Chenghai handbook comparison (211×80)
+
+The Chenghai handbook comparison evaluates 211 published Q&A entries across 80 questions (including 30 cross-entry questions), with the same `Qwen3.6` model used by AmendAQ, a fixed traditional RAG pipeline, and LightRAG. All systems read the published Q&A under condition A.
+
+**Condition A scores (by type):**
+
+| Type | Count | AmendAQ | Traditional RAG | LightRAG |
+|---|---|---|---|---|
+| Single lookup | 9 | 9/9 | 9/9 | 9/9 |
+| Obligation | 30 | 29/30 | 28/30 | 25/30 |
+| Numeric | 25 | 22/25 | 21/25 | 24/25 |
+| Refusal | 8 | 6/8 | 8/8 | 8/8 |
+| No fabrication | 8 | 8/8 | 8/8 | 6/8 |
+| **Total** | **80** | **74/80** | **74/80** | **72/80** |
+
+**Cross-entry questions (30 requiring 2+ entries):** AmendAQ 29/30, Traditional RAG 27/30, LightRAG 27/30 (condition A/B identical). The original 10 complex questions: AmendAQ 10/10.
+
+**Latency (condition A, median):** Traditional RAG 8.1s (retrieval 4.8s + generation 3.0s), AmendAQ 22.4s, LightRAG 33.9s (indexing 903.0s for LightRAG). AmendAQ is slower and uses more tokens (1,237,956 input tokens for 257 generations across 80 questions).
+
+**Reproduce:**
+
+```bash
+uv sync --extra compare
+uv run python scripts/run_compare.py --out-dir data/eval/compare200 --report docs/对比测试_澄海手册_200条.md --systems AmendAQ,traditional,lightrag --resume
+```
+
+`uv sync --extra compare` runs the two-system comparison (`--systems AmendAQ,traditional`) out of the box. To add the LightRAG column, either install the `lightrag` extra (`uv sync --extra compare --extra lightrag`) or set `AMENDAQ_LIGHTRAG_ROOT=/path/to/LightRAG`.
+
+Full write-up: [docs/posts/03-when-to-choose-amendaq.md](docs/posts/03-when-to-choose-amendaq.md). Public fixtures: [handbook source + published Q&A](docs/对比测试_澄海手册_知识库.md) and [questions + rubric answers](docs/对比测试_澄海手册_题目.md).
 
 The original **Xinghe 13-question benchmark** is **still not reproducible from this repo**:
 
@@ -153,7 +181,7 @@ The code backs the Dev.to series [AmendAQ, a better RAG?](https://dev.to/zealot2
 | # | Title | What it covers |
 |---|-------|----------------|
 | 1 | [RAG 这六年怎么走过来的、2026 年前沿在做什么、以及它还剩哪些没解决的问题](https://dev.to/zealot2002/ru-guo-tiao-zhi-du-ke-yi-gai-wan-jiu-sheng-xiao-huan-yao-xian-xiang-liang-hua-ma-501b) ([repo](docs/posts/01-why-amendaq.md)) | Six years of RAG, 2026 frontier, vector limits on policy handbooks; AQ / AmendAQ |
-| 2 | [我们做了 AmendAQ：可改的问答，发布就是索引](https://dev.to/zealot2002/amendaq-zai-amendaq-li-shi-ben-ke-yi-gai-de-wen-da-539) ([repo](docs/posts/02-what-amendaq-is.md)) | Publish gate, ID pick, verify by rules; shortcuts that did not ship |
+| 2 | [我们做了 AmendAQ：可改的问答，发布就是索引](https://dev.to/zealot2002/amendaq-zai-mycs-li-shi-ben-ke-yi-gai-de-wen-da-539) ([repo](docs/posts/02-what-amendaq-is.md)) | Publish gate, ID pick, verify by rules; shortcuts that did not ship |
 | 3 | [澄海手册对照：AmendAQ、传统 RAG 与 LightRAG](https://dev.to/zealot2002/tong-ti-dui-zhao-zhi-hou-you-xie-chang-jing-ke-yi-xuan-ze-amendaq-1dhk) ([repo](docs/posts/03-when-to-choose-amendaq.md)) | 103×48 and 211×80 (30 cross-AQ) score tables, per-question matrix, when to pick which path |
 
 Source files: [docs/posts/](docs/posts/). Index: [docs/SERIES.md](docs/SERIES.md).
