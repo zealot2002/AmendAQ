@@ -17,6 +17,12 @@ compare = [
     "jieba>=0.42.1",
     "sentence-transformers>=3.3.0",
     "python-dotenv>=1.0",
+    "json-repair>=0.30",
+    "pydantic>=2.0",
+    "networkx>=3.0",
+    "nano-vectordb>=0.0.4",
+    "aiohttp>=3.9",
+    "tiktoken>=0.7",
 ]
 
 [project.scripts]

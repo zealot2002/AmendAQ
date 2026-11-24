@@ -81,6 +81,17 @@ def test_score_ignores_spaces_and_digit_edges() -> None:
     assert score_answer(marriage["gold"], marriage)["ok"]
 
 
+def test_lightrag_baseline_deps() -> None:
+    import tiktoken
+    from amendaq.compare.lightrag_baseline import available
+
+    _ = tiktoken.__version__
+    ok, reason = available()
+    if not ok and "未找到" in reason:
+        return
+    assert ok, reason
+
+
 def test_import_publishes_every_faq(tmp_path) -> None:
     from amendaq.compare.prepare import build_faq_db
     from amendaq.db.connection import connect

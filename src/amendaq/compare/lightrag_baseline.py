@@ -153,3 +153,17 @@ class LightRAGBaseline:
             "prompt_tokens": self._llm.usage_totals["prompt_tokens"] - before_prompt,
             "completion_tokens": self._llm.usage_totals["completion_tokens"] - before_completion,
         }
+
+    def close(self) -> None:
+        """Release in-memory storages so a second corpus can run in one process."""
+        rag = getattr(self, "_rag", None)
+        if rag is None:
+            return
+        try:
+            asyncio.run(rag.finalize_storages())
+        except RuntimeError as exc:
+            if "Event loop is closed" not in str(exc):
+                raise
+        except Exception:
+            pass
+        self._rag = None

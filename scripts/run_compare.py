@@ -51,6 +51,11 @@ def main() -> int:
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--out-dir", default="")
     parser.add_argument("--report", default="")
+    parser.add_argument(
+        "--only-prefix",
+        default="",
+        help="Only run question ids with this prefix (e.g. x_cross_ for the 20 cross-bench items).",
+    )
     args = parser.parse_args()
     if args.out_dir:
         OUT_DIR = Path(args.out_dir)
@@ -70,6 +75,8 @@ def main() -> int:
         questions = QUESTIONS[:60] + list(CROSS20_QUESTIONS)
     else:
         questions = list(QUESTIONS)
+    if args.only_prefix:
+        questions = [item for item in questions if str(item["id"]).startswith(args.only_prefix)]
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     started = time.perf_counter()
@@ -88,7 +95,12 @@ def main() -> int:
     payload["faq_count"] = len(iter_faqs())
     payload["source_chars"] = len(render_source())
     payload["faq_chars"] = len(render_faq())
-    payload["question_count"] = len(questions)
+    if args.only_prefix and (
+        OUT_DIR.name == "compare200" or str(args.out_dir).rstrip("/").endswith("compare200")
+    ):
+        payload["question_count"] = 60 + len(CROSS20_QUESTIONS)
+    else:
+        payload["question_count"] = len(questions)
     payload["generator"] = resolve_llm_model_name()
     payload["lock"] = pipeline_lock()
     payload["title"] = TITLE
@@ -254,64 +266,69 @@ def _run_lightrag(payload: dict, questions: list[dict], conditions: list[str] | 
         print(f"joyjoy: lightrag index {condition}", flush=True)
         llm = create_llm()
         llm.timeout = 180
+        baseline = None
         try:
-            baseline = LightRAGBaseline(
-                text,
-                working_dir=OUT_DIR / "lightrag" / condition,
-                llm=llm,
-            )
-        except Exception as exc:
-            payload["lightrag_skipped"] = f"{condition}: {exc}"
-            print(f"joyjoy: skip lightrag {condition}: {exc}", flush=True)
-            return
-        cond = block["conditions"].setdefault(condition, {"rows": []})
-        done = {row["id"] for row in cond["rows"]}
-        for index, spec in enumerate(questions, start=1):
-            if spec["id"] in done:
-                continue
-            print(f"joyjoy: lightrag {condition} {index}/{len(questions)} {spec['id']}", flush=True)
             try:
-                outcome = baseline.answer(spec["question"])
-                error = None
+                baseline = LightRAGBaseline(
+                    text,
+                    working_dir=OUT_DIR / "lightrag" / condition,
+                    llm=llm,
+                )
             except Exception as exc:
-                outcome = {
-                    "answer": "",
-                    "total_s": 0,
-                    "retrieve_s": None,
-                    "generate_s": None,
-                    "llm_calls": None,
-                    "prompt_tokens": 0,
-                    "completion_tokens": 0,
-                }
-                error = str(exc)
-                print(f"joyjoy: lightrag error {spec['id']}: {exc}", flush=True)
-            scored = score_answer(outcome["answer"], spec)
-            cond["rows"].append(
-                {
-                    "id": spec["id"],
-                    "kind": spec["kind"],
-                    "ok": scored["ok"],
-                    "answer": outcome["answer"],
-                    "missing": scored["missing"],
-                    "forbidden": scored["forbidden"],
-                    "error": error,
-                    "total_s": outcome["total_s"],
-                    "retrieve_s": outcome["retrieve_s"],
-                    "generate_s": outcome["generate_s"],
-                    "llm_calls": outcome["llm_calls"],
-                    "prompt_tokens": outcome["prompt_tokens"],
-                    "completion_tokens": outcome["completion_tokens"],
-                }
+                payload["lightrag_skipped"] = f"{condition}: {exc}"
+                print(f"joyjoy: skip lightrag {condition}: {exc}", flush=True)
+                continue
+            cond = block["conditions"].setdefault(condition, {"rows": []})
+            done = {row["id"] for row in cond["rows"]}
+            for index, spec in enumerate(questions, start=1):
+                if spec["id"] in done:
+                    continue
+                print(f"joyjoy: lightrag {condition} {index}/{len(questions)} {spec['id']}", flush=True)
+                try:
+                    outcome = baseline.answer(spec["question"])
+                    error = None
+                except Exception as exc:
+                    outcome = {
+                        "answer": "",
+                        "total_s": 0,
+                        "retrieve_s": None,
+                        "generate_s": None,
+                        "llm_calls": None,
+                        "prompt_tokens": 0,
+                        "completion_tokens": 0,
+                    }
+                    error = str(exc)
+                    print(f"joyjoy: lightrag error {spec['id']}: {exc}", flush=True)
+                scored = score_answer(outcome["answer"], spec)
+                cond["rows"].append(
+                    {
+                        "id": spec["id"],
+                        "kind": spec["kind"],
+                        "ok": scored["ok"],
+                        "answer": outcome["answer"],
+                        "missing": scored["missing"],
+                        "forbidden": scored["forbidden"],
+                        "error": error,
+                        "total_s": outcome["total_s"],
+                        "retrieve_s": outcome["retrieve_s"],
+                        "generate_s": outcome["generate_s"],
+                        "llm_calls": outcome["llm_calls"],
+                        "prompt_tokens": outcome["prompt_tokens"],
+                        "completion_tokens": outcome["completion_tokens"],
+                    }
+                )
+                cond["index_s"] = baseline.index_seconds
+                _write_partial(payload)
+            cond["summary"] = summarize(cond["rows"])
+            cond["cost"] = _cost(
+                cond["rows"],
+                index_s=baseline.index_seconds,
+                index_llm_calls=int(baseline.index_llm_calls or 0),
             )
-            cond["index_s"] = baseline.index_seconds
-            _write_partial(payload)
-        cond["summary"] = summarize(cond["rows"])
-        cond["cost"] = _cost(
-            cond["rows"],
-            index_s=baseline.index_seconds,
-            index_llm_calls=int(baseline.index_llm_calls or 0),
-        )
-        cond["rows"] = _public_rows(cond["rows"])
+            cond["rows"] = _public_rows(cond["rows"])
+        finally:
+            if baseline is not None:
+                baseline.close()
 
 
 def _finalize(payload: dict) -> None:
