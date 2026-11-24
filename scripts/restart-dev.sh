@@ -21,7 +21,8 @@ log() {
 }
 
 lan_ipv4() {
-  local iface ip
+  local ip
+  # Try macOS ipconfig first
   for iface in en0 en1 bridge0; do
     ip="$(ipconfig getifaddr "$iface" 2>/dev/null || true)"
     if [[ -n "$ip" ]]; then
@@ -29,6 +30,17 @@ lan_ipv4() {
       return 0
     fi
   done
+  # Try Linux ip/hostname commands
+  ip="$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+' || true)"
+  if [[ -n "$ip" ]]; then
+    printf '%s' "$ip"
+    return 0
+  fi
+  ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+  if [[ -n "$ip" ]]; then
+    printf '%s' "$ip"
+    return 0
+  fi
   return 1
 }
 
@@ -48,10 +60,10 @@ print_access_urls() {
   if ip="$(lan_ipv4)"; then
     log "同事 ${label}（同一 WiFi/局域网）: http://${ip}:${port}/"
   else
-    log "未检测到局域网 IPv4；请在本机运行: ipconfig getifaddr en0"
+    log "未检测到局域网 IPv4；请用 'ip addr' 或 'hostname -I' 查看本机 IP"
     log "同事访问: http://<你的局域网IP>:${port}/"
   fi
-  log "若连不上：macOS 防火墙需放行 Python/终端入站；问答走 LLM 需本机 .env 已配置 Key"
+  log "若连不上：防火墙需放行端口入站；问答走 LLM 需本机 .env 已配置 Key"
 }
 
 kill_pid_file() {
